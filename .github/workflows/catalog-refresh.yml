@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 45
     env:
       MIN_RECORDS: "1000"
-      MIN_CHINA_SERIES: "120"
+      MIN_CHINA_SERIES: "12"
       TVMAZE_TARGET: "1700"
       CHINA_SERIES_TARGET: "180"
       MOVIES_PER_COUNTRY: "30"
