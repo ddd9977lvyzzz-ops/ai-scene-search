@@ -141,11 +141,28 @@ def parse_intent(text: str) -> SceneProfile:
     if any(x in t for x in ['视觉惊喜','画面好看','视觉奇观']): _add_unique(p.surprise_preferences, 'visual_set_piece')
     if any(x in t for x in ['不俗套','有新鲜感','有点新东西']): _add_unique(p.surprise_preferences, 'fresh_premise')
 
+    # Plot-fact constraints. These are stronger than ordinary taste tags.
+    # Important: unknown != false. A title must carry positive evidence to satisfy required_facts.
+    fact_patterns = [
+        (['没有任何人死','没有人死','没人死','不死人','不要有人死','不能死人'], 'no_character_death'),
+        (['圆满结局','结局圆满','大团圆','happy ending'], 'happy_ending'),
+        (['不要出轨','没有出轨','无出轨'], 'no_infidelity'),
+        (['不要伤害动物','动物不要死','没有动物伤害'], 'no_animal_harm'),
+        (['不要血腥','不血腥','没有血腥'], 'no_gore'),
+        (['不要跳吓','别有跳吓','没有跳吓'], 'no_jump_scares'),
+        (['不要大尺度','没有大尺度','别有亲密戏','不要亲密戏'], 'no_sexual_content'),
+        (['结局收束','不要开放式结局','别烂尾'], 'closed_ending'),
+    ]
+    for phrases, fact in fact_patterns:
+        if any(x.casefold() in t.casefold() for x in phrases):
+            _add_unique(p.required_facts, fact)
+
     # Negative constraints. Only explicit negatives become hard gates.
     if any(x in t for x in ['不要恐怖','不看恐怖','别吓人','不要吓人','别有鬼']):
         _add_unique(p.avoid_genres, 'Horror'); _add_unique(p.avoid_risks, 'fear_or_horror')
     if any(x in t for x in ['不要尴尬','不要太尴尬','别太尴尬','社死少一点']): _add_unique(p.avoid_risks, 'social_embarrassment')
     if any(x in t for x in ['别有亲密戏','不要亲密戏','适合爸妈','不要大尺度']): _add_unique(p.avoid_risks, 'mature_rating')
+    if any(x in t for x in ['适合全家','全家都能看','老少皆宜','适合爸妈一起看']): _add_unique(p.required_facts, 'family_safe')
     if any(x in t for x in ['不要低幼','不要太低幼','别太低幼','不想太低幼']): _add_unique(p.avoid_risks, 'childish')
     if any(x in t for x in ['不要太虐','不要虐','别太虐','不想看虐的','别太沉重']): _add_unique(p.avoid_risks, 'emotionally_heavy')
     if any(x in t for x in ['不要暴力','别太暴力','不想看打打杀杀']): _add_unique(p.avoid_risks, 'violence_possible')
@@ -171,7 +188,9 @@ def parse_intent(text: str) -> SceneProfile:
 
     # Year.
     ym=re.search(r'(20\d{2})\s*(?:年)?(?:以后|之后|起|以来)',t)
+    explicit_year=re.search(r'(20\d{2})\s*(?:年)?(?=[^\d]|$)',t)
     if ym: p.year_min=int(ym.group(1))
+    elif explicit_year: p.year_min=int(explicit_year.group(1))
     elif '近五年' in t: p.year_min=2022
     elif any(x in t for x in ['新一点','更新一点','近几年']): p.year_min=2020
 
@@ -185,7 +204,7 @@ def parse_intent(text: str) -> SceneProfile:
     signals = [
         p.companions,p.scene,p.moods,p.cognitive_load,p.content_types,p.genres,p.required_signals,
         p.relationship_focus,p.audience_preferences,p.tone_preferences,p.pace_preferences,p.runtime_max,p.year_min,
-        p.avoid_genres,p.avoid_risks,p.platforms,p.popularity_preference,p.quality_preference,p.surprise_preferences,p.source_reference,
+        p.avoid_genres,p.avoid_risks,p.required_facts,p.avoid_facts,p.platforms,p.popularity_preference,p.quality_preference,p.surprise_preferences,p.source_reference,
     ]
     filled=sum(bool(x) for x in signals)
     strong_core=bool(p.required_genres or p.required_signals or (p.relationship_focus and p.popularity_preference) or (p.genres and p.tone_preferences))
