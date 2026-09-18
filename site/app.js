@@ -226,17 +226,32 @@ function card(x,i){
 }
 function socialDiscovery(items){
   if(!items.length)return '';
-  const focus=items[0];
+  const shown=new Set(items.map(x=>x.id));
+  const extras=state.catalog.filter(x=>hardOk(x)&&!shown.has(x.id)).sort((a,b)=>score(b)-score(a)).slice(0,2);
   const platform=state.profile.platform?labels[state.profile.platform]:null;
-  const sources=[
-    ['小红书','合规 Web Search','按片名 + 场景词检索公开索引内容；不直接绕过平台反爬。'],
-    ['公众号','合规 Web Search','检索被公开索引的文章与媒体内容，保留原始链接、作者和发布时间。'],
-    ['百度','AI Search API','负责中文全网检索、新闻时效与跨站结果；生产端通过服务端 API 调用。'],
-    ['X','Recent Search API','通过官方 Posts Search 读取公开讨论、时间和互动指标。']
-  ];
-  const rows=sources.map(s=>`<div class="social-source"><b>${esc(s[0])} · ${esc(s[1])}</b><p>${esc(s[2])}</p></div>`).join('');
-  const platformNote=platform?` 当前仍严格限定在 ${esc(platform)} 已验证可用的候选内。`:'';
-  return `<section class="social-discovery"><div class="social-discovery-head"><div><h4>猜你还想确认：《${esc(focus.t)}》在全网为什么被讨论？</h4><p class="social-sub">这里展示联网观点层的来源策略，不伪造实时帖子。生产版会把社媒讨论作为弱排序信号，并保留来源、时间、作者与可信度。${platformNote}</p></div><span class="social-badge">Social Evidence</span></div><div class="social-source-grid">${rows}</div></section>`;
+  const sources='小红书公开索引 / 公众号公开文章 / 百度 AI Search / X Recent Search';
+  const cards=extras.length?extras.map(x=>{
+    const platformText=arr(x.pl).map(p=>labels[p]||p).join(' / ');
+    return `<div class="social-source"><b>猜你还会想看 · ${esc(x.t)}</b><p>${esc(reason(x))}${platformText?' · '+esc(platformText):''}</p><p>联网层会检索：${esc(sources)}，并做实体匹配、来源可信度、去重、时效和跨平台一致性校验。</p><button class="rec-more" type="button" data-social="${esc(x.id)}">联网看口碑</button><div class="social-live-result" data-social-result="${esc(x.id)}"></div></div>`;
+  }).join(''):'<div class="social-source"><b>联网观点层</b><p>当前硬条件已经非常窄，没有额外合法候选可做“猜你想看”。</p></div>';
+  const platformNote=platform?` 当前仍严格限定在 ${esc(platform)} 已验证可用候选内。`:'';
+  return `<section class="social-discovery"><div class="social-discovery-head"><div><h4>猜你还想看</h4><p class="social-sub">不是再做一轮普通相似推荐，而是把候选放进公开社媒与全网观点层做二次验证。社媒只影响合法候选内部排序，不会突破平台和剧情边界。${platformNote}</p></div><span class="social-badge">Social Evidence</span></div><div class="social-source-grid">${cards}</div></section>`;
+}
+async function loadSocialContext(id,button){
+  const box=document.querySelector('[data-social-result="'+CSS.escape(id)+'"]');
+  if(location.hostname.endsWith('github.io')){
+    if(box)box.innerHTML='<p>Pages Demo 不暴露搜索 API 密钥；完整 FastAPI 已实现 /social-context 实时接口。这里不会伪造小红书、公众号或 X 的实时帖子。</p>';
+    return;
+  }
+  if(button){button.disabled=true;button.textContent='联网检索中…'}
+  try{
+    const r=await fetch('/v1/content/'+encodeURIComponent(id)+'/social-context?refresh=true');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json(),agg=data.aggregate||{},ev=arr(data.evidence).slice(0,4);
+    const rows=ev.map(v=>`<p><b>${esc(v.platform||'web')}</b> · ${esc(v.source_title||'公开内容')} · 可信度 ${Math.round((v.authenticity_score||0)*100)}%</p>`).join('');
+    if(box)box.innerHTML=`<p>社媒综合信号 ${Math.round((agg.score||0)*100)} / 100 · 置信度 ${Math.round((agg.confidence||0)*100)}%</p>${rows||'<p>当前未获得足够可靠的公开讨论。</p>'}`;
+  }catch(e){if(box)box.innerHTML='<p>联网观点暂不可用；推荐本身仍按内容硬边界返回。</p>'}
+  finally{if(button){button.disabled=false;button.textContent='刷新联网口碑'}}
 }
 function render(items){
   const intro=items.length?'我先锁住平台、剧情事实和风险边界，再做多路召回。社媒热度只影响合法候选内部的排序，不会把别的平台或踩雷内容推回来。':'这组条件没有足够确定的候选，我不会把“未知”冒充“满足”。下面给出最接近但没过线的原因。';
@@ -365,6 +380,7 @@ document.addEventListener('click',e=>{
   }
   const d=e.target.closest('[data-detail]');if(d)openDetail(d.dataset.detail);
   const s=e.target.closest('[data-save]');if(s)toggleSave(s.dataset.save);
+  const social=e.target.closest('[data-social]');if(social)loadSocialContext(social.dataset.social,social);
 });
 $('#composer').addEventListener('submit',e=>{e.preventDefault();sendMessage($('#message-input').value)});
 $('#message-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(e.target.value)}});
