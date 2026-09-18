@@ -27,6 +27,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate front-end JavaScript
+        run: node --check site/app.js
+
+      - name: Validate deep-agent demo markers
+        shell: bash
+        run: |
+          grep -q "no_character_death" site/app.js
+          grep -q "家业" site/app.js
+          grep -q "generatedPoster" site/app.js
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
