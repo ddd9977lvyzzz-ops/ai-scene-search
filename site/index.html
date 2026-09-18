@@ -19,14 +19,14 @@
     <section class="welcome" id="welcome">
       <p class="eyebrow">SCENE-AWARE MOVIE AGENT</p>
       <h1>今晚，想看什么？</h1>
-      <p class="lede">直接说场景和边界，不必先想片名。比如“小众恋爱片”“和朋友聚会想看轻松好笑的电影”“睡前治愈一点，不要太虐”。明确条件先锁定，再在合法候选中探索。</p>
+      <p class="lede">不用先想片名，也不用只说“爱情 / 悬疑”。你可以直接说人类真正会在意的边界：<strong>不要有人死、别出轨、不要跳吓、和爸妈看别尴尬、今晚脑子不想转</strong>。Agent 会先确认“能不能看”，再判断“适不适合此刻”。</p><div class="capability-strip"><span>剧情事实约束</span><span>雷点硬过滤</span><span>场景向量</span><span>相似作品探索</span><span>近似失败解释</span></div>
       <div class="starter-grid" id="starter-grid" aria-label="示例问题"></div>
     </section>
     <section class="conversation hidden" id="conversation" aria-live="polite"><div class="messages" id="messages"></div></section>
     <section class="composer-dock">
       <div class="active-profile hidden" id="active-profile"></div>
       <form class="composer" id="composer">
-        <textarea id="message-input" rows="1" maxlength="1000" placeholder="例如：想自己追一部节奏快的国产剧，不要太虐" aria-label="描述你的观看场景"></textarea>
+        <textarea id="message-input" rows="1" maxlength="1000" placeholder="例如：我想看没有任何人死去的电影，最好结局也圆满" aria-label="描述你的观看场景"></textarea>
         <button class="send" id="send" type="submit" aria-label="发送">发送</button>
       </form>
       <div class="quick-actions hidden" id="quick-actions"></div>
@@ -34,7 +34,7 @@
     </section>
     <details class="system-note">
       <summary>数据与检索说明</summary>
-      <div class="system-grid"><p id="data-note">在线 Demo：公开内容源 + 精选国产片单 · 完整工程：3,339 条内容</p><p>硬约束 → 特征匹配 → 场景排序 → 探索控制</p></div>
+      <div class="system-grid"><p id="data-note">在线 Demo：公开内容源 + 2026 国产精选 + 安全事实样本 · 完整工程：3,339 条内容</p><p>Hard Gate → 稀疏召回 → 场景向量 → RRF/排序 → Evidence</p></div>
     </details>
   </main>
   <dialog class="detail-dialog" id="detail-dialog"><button class="dialog-close" id="detail-close" type="button" aria-label="关闭">×</button><div id="detail-body"></div></dialog>
