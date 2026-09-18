@@ -1,336 +1,345 @@
-# PRD｜此刻看什么：AI 场景化影视决策 Agent
+# 影（YING）PRD V1.3｜场景化影视决策 Agent
 
-## 1. 产品定义
+> 一句话定位：**不是帮用户“搜到一部片”，而是理解此刻的观看场景、硬边界和情绪成本，替用户做更可靠的观看决策。**
 
-“此刻看什么”不是“输入片名或标签后查数据库”的影视搜索框，而是一个 Viewing Decision Agent。
+## 1. 用户与核心问题
 
-用户往往不知道自己要搜哪一部片，而是在表达一个不完整的观看决策，例如：
+### 1.1 核心用户群体
 
-- 我想看小众恋爱片
-- 一个人睡前看，治愈一点，不要太虐
-- 和同学聚会，找一部大家都能笑出来的电影
-- 想看悬疑，但不要恐怖
-- 像《功夫》一样好笑，但不要再给我热门片
-- 给我一点惊喜，但别越过我说的雷点
+| 用户群 | 典型特征 | 主要问题 |
+|---|---|---|
+| 决策疲劳用户 | 打开多个视频平台仍不知道看什么 | 选择多、决策成本高，传统榜单不理解当下状态 |
+| 场景型用户 | 睡前、吃饭、聚会、通勤、约会、陪父母 | “好片”不等于“此刻适合” |
+| 高边界用户 | 不想死人、不要出轨、不要跳吓、不要大尺度 | 类型标签过粗，普通推荐无法保证剧情边界 |
+| 内容探索用户 | 想看小众、跨地区、非爆款内容 | 算法容易困在热门内容和已有偏好 |
+| 多人共看用户 | 情侣、朋友、家人需求不同 | 很难同时满足所有人的雷点与偏好 |
 
-系统的核心任务是把自然语言编译成可执行的约束、偏好与探索预算，再在合法候选集合中推荐、解释和探索。
+### 1.2 产品中的角色
 
-## 2. 产品目标
+- **Viewer**：提问、收藏、建立个人观看偏好。
+- **Group Viewer**：多人输入边界，求共同可接受结果（P1）。
+- **Curator**：发布“场景 + 边界 + 片单”的社区方案。
+- **Content / Platform Partner**：提供正版可用性、物料和跳转链接；不能修改用户硬边界。
+- **System Moderator**：处理虚假平台信息、错误剧情事实、刷榜和社区低质内容。
 
-1. 场景理解：理解谁一起看、观看时间、注意力、情绪、时长和容忍度。
-2. 确定性优先：明确说出的类型、时长、平台、地区、雷点不能被向量相似度覆盖。
-3. 内容理解：除类型外，还理解节奏、关系线、情绪、风险、惊喜维度。
-4. 可解释推荐：说明为什么适合此刻、可能踩什么雷、有哪些无剧透看点。
-5. 可控探索：允许“给我点惊喜”，但探索只发生在满足 Hard Constraints 的候选池。
-6. 多轮决策：信息不足时先问信息增益最高的问题，而不是直接随机给五部片。
+### 1.3 五个核心痛点
 
-非目标：不把 LLM 当事实数据库，不让模型凭记忆宣称具体剧情雷点，不用一个“万能 embedding”替代全部业务规则，也不设计绕过平台反爬或风控的采集链路。
+1. **搜索是片名导向，不是场景导向**：用户经常只知道“今晚很累”“和爸妈看”“不想看到任何人死”。
+2. **平台可用性不可靠**：搜索结果可能推荐用户当前平台无法观看的作品。
+3. **影视雷点不是普通标签**：“没有人死亡”需要正向剧情事实证据，不能用“数据库没写死亡”代替。
+4. **社媒口碑噪声大**：热度、营销、搬运、刷量与真实体验混在一起。
+5. **推荐没有沉淀**：用户看过、收藏过、踩过雷的决策过程没有形成可复用资产。
 
-## 3. Intent Schema
+---
 
-自然语言不会直接变成一个向量，而是先生成 SceneProfile。
+## 2. 场景 → 产品功能
 
-### 3.1 Hard Constraints
+| 使用场景 | 用户表达 | 对应功能 |
+|---|---|---|
+| 一个人下班很累 | “今晚脑子不想转” | Cognitive Load、节奏、可打断性排序 |
+| 跟父母一起看 | “不要尴尬、不要大尺度” | Family-safe Plot Facts + Risk Hard Gate |
+| 极强剧情边界 | “不要任何人死” | required_facts=no_character_death；Unknown ≠ Safe |
+| 指定视频平台 | “我只看爱奇艺” | Verified Platform Availability Hard Gate |
+| 想找非爆款 | “小众一点，别都是热门” | Popularity / Novelty Channel |
+| 想突破信息茧房 | “给我点惊喜” | Exploration Controller，只在合法候选内探索 |
+| 已有参考作品 | “像《功夫》但不要太暴力” | Reference-title Recall + Violence Hard Gate |
+| 不想自己做选择 | “别给列表，直接替我选一个” | Decision Mode |
+| 推荐后仍犹豫 | “大家为什么喜欢这部？” | Social Evidence：公众号 / 小红书 / 百度 / X 等来源分析 |
+| 长期使用 | 收藏、看过、踩雷 | 账户、片单、长期偏好与负反馈记忆 |
+| 社区发现 | “爸妈同看不尴尬片单” | Scene Card 社区：场景 + 边界 + 片单 |
 
-明确说出后必须满足：
+---
 
-- content_type
-- required_genres
-- runtime_max
-- year_min
+## 3. 核心产品结构
+
+### 3.1 首页 / Agent
+
+输入自然语言 → 自动提取：
+
+- 场景：独处 / 家人 / 朋友 / 情侣 / 聚会 / 睡前等
+- 内容：电影 / 剧集 / 综艺 / 动漫
+- 情绪：轻松 / 治愈 / 刺激 / 烧脑
+- 剧情边界：死亡、出轨、动物伤害、跳吓、血腥、大尺度、开放结局等
+- 平台：爱奇艺 / 腾讯视频 / 优酷 / 芒果TV / Netflix 等
+- 探索强度：精准 / 适度探索 / 惊喜
+
+### 3.2 推荐结果
+
+每部作品必须回答四件事：
+
+1. **为什么适合你现在这个场景**
+2. **明确命中了哪些硬条件**
+3. **可能的雷点 / 证据不足项**
+4. **在哪里可看，以及平台证据更新时间**
+
+结果默认 5 部；Decision Mode 只给 1 部。
+
+### 3.3 “猜你还想确认”联网观点层
+
+推荐结果之后提供 Social Evidence，而不是简单再塞一排相似影片：
+
+- 这部作品在不同社区被讨论的核心角度
+- 正面 / 负面体验分别集中在哪里
+- 不同来源是否互相验证
+- 哪些讨论可能来自营销、搬运或异常互动
+- 保留原始链接、作者、时间和来源平台
+
+**社媒信号只能作为弱排序特征，不能推翻平台、风险和剧情事实 Hard Gate。**
+
+### 3.4 账户与我的片单
+
+- 注册 / 登录
+- 收藏
+- 看过 / 不喜欢 / 踩雷
+- 自定义片单
+- 保存 Scene Card
+- 后续推荐将收藏视为**弱偏好**，不会因为曾经收藏爱情片就永远推爱情片。
+
+### 3.5 社区模式
+
+社区的内容单位不是“影评”，而是 **Scene Card**：
+
+> 场景 + 人群 + 硬边界 + 推荐理由 + 片单
+
+例：
+
+- 和爸妈看不尴尬
+- 没有人死的轻松电影
+- 工作日 90 分钟内
+- 三个人聚会必须好笑
+- 分手后不想再看爱情线
+
+Scene Card 可收藏、复用并一键进入 Agent；优秀 Scene Card 形成自然传播入口。
+
+---
+
+## 4. 推荐与数据系统
+
+### 4.1 内容特征资产
+
+每部作品拆成独立数据层，而不是平均成一个“万能向量”：
+
+**Metadata**  
+类型、年份、地区、语言、时长、平台。
+
+**Scene Features**  
+适合谁看、注意力要求、是否可被打断、适合吃饭/睡前/聚会等。
+
+**Content Understanding**  
+情绪、节奏、关系、主题、叙事密度、世界观、惊喜类型。
+
+**Plot Facts**  
+no_character_death、happy_ending、no_infidelity、no_animal_harm、no_gore、no_jump_scares、family_safe 等。
+
+**Evidence**  
+剧情事实、雷点、平台可用性都必须带来源和置信度。
+
+### 4.2 召回链路
+
+```text
+Query Compiler
+    ↓
+Constraint Ledger
+    ↓
+并行召回
+├ Structured / SQL
+├ BM25 / FTS
+├ Semantic Vector
+├ Interpretable Scene Vector
+├ Reference-title Recall
+└ Cached Social Signal
+    ↓
+RRF Candidate Fusion
+    ↓
+Hard Gate
+    ↓
+Contextual Rerank
+    ↓
+Evidence RAG
+    ↓
+Decision / Explanation
+```
+
+**Hard Gate 永远先于社媒热度和探索。**
+
+### 4.3 平台可用性
+
+平台字段区分：
+
+- `origin_platform`：首播 / 来源信息
+- `verified_availability`：当前地区已验证可观看
+- `unknown`：没有可靠证据
+
+当用户明确说“只看爱奇艺”时，只接受 `verified_availability=iqiyi` 的候选。
+
+---
+
+## 5. 社媒数据：怎么抓、怎么分真伪
+
+### 5.1 数据接入
+
+**X**：使用官方 Recent Search API。  
+**百度**：使用百度 AI Search Web Search API，可指定站点过滤。  
+**小红书**：官方开放平台当前主要面向电商/店铺能力，不设计反爬绕过；通过授权来源、公开索引 Web Search 或合作数据接入。  
+**公众号**：优先公开索引、媒体合作或授权数据，不爬取私域/受限内容。
+
+### 5.2 可信度评分
+
+每条 Social Evidence 记录：
+
+- source_url
 - platform
-- language / region
-- avoid_genres
-- avoid_risks
-- required_signals，例如“好笑”“节奏快”这类不满足就明显答错的信号
+- author / account
+- published_at
+- engagement
+- entity_confidence
+- source_reliability
+- authenticity_score
+- recommendation_signal
 
-### 3.2 Soft Preferences
+真实性判断至少包含：
 
-用于排序，不要求全部满足：
+1. **实体匹配**：帖子讨论的确实是这部作品。
+2. **来源等级**：官方 / 媒体 / 已验证创作者 / 普通 UGC。
+3. **去重与搬运检测**：重复文本降权。
+4. **时效衰减**：过旧讨论降低权重。
+5. **跨平台一致性**：多个独立来源同时出现才提高置信度。
+6. **互动异常**：极端互动但低来源可信度不直接视为真实口碑。
 
-- companions
-- scene
-- moods
-- tone
-- pace
-- cognitive_load
-- relationship_focus
-- popularity_preference
-- quality_preference
-- audience preference
-- reference-title similarity
+Social Score 在总排序中的权重控制在低位（当前设计约 5%），避免“热搜即好看”。
 
-### 3.3 Exploration Budget
+---
 
-- precise = 0
-- balanced 约 0.3
-- explore 约 0.65
+## 6. 商业化
 
-探索预算只影响合法集合内部排序，不会改变 Hard Gate。
+### Free
 
-## 4. AI 产品是否需要特征清单
+- 基础场景推荐
+- 硬边界筛选
+- 基础收藏
+- 有限次数联网观点检索
+- 公共 Scene Card
 
-需要，而且要把它当作 Feature Contract，而不是散落在 Prompt 中的一堆形容词。
+### YING Pro（订阅）
 
-| 特征层 | 示例 | 主要用途 |
-| --- | --- | --- |
-| Hard Metadata | 类型、语言、地区、时长、年份、平台 | 精确过滤 |
-| Scene Context | 独处、朋友、家庭、聚会、睡前、饭后、通勤 | 场景适配 |
-| Affect | 轻松、治愈、好笑、浪漫、紧张、刺激、烧脑 | 情绪匹配 |
-| Narrative | 节奏、认知负担、信息密度、反转强度 | 观看成本 |
-| Relationship | 恋爱、友情、家庭、职场 | 关系线匹配 |
-| Tone | 甜、温柔、现实、苦甜、暗黑、怪趣、风格化 | 气质匹配 |
-| Risk | 恐怖、暴力、成人尺度、社死、情绪沉重、死亡哀伤 | Hard / Soft Negative |
-| Discovery | 热度、主流度、新鲜度、评分 | 探索排序 |
-| Evidence Quality | 数据源、置信度、剧透等级 | 决定是否允许下结论 |
+核心付费价值不是“多推荐几部”，而是降低高频用户的决策成本：
 
-Feature Schema 要版本化。每个新特征必须说明数据来源、计算方式、是否可做 Hard Constraint、缺失值策略、置信度、使用环节以及对应 Eval Case。
+- 无限 / 更高频 Social Evidence 实时检索
+- 高级剧情雷点库与更细 Spoiler Control
+- 长期偏好记忆与自动复盘
+- 多人 Group Consensus
+- 跨平台可用性提醒 / 上线提醒
+- 私人片单 Agent 与自动整理
 
-## 5. 是否要平均池化成百维向量
+### B2B / 联盟收入
 
-不建议把全部标签、剧情、雷点、平台、时长平均池化成一个约 100 维的万能向量。
+- 视频平台正版跳转 / 联盟分成
+- 影视社区 / 媒体的 Scene Recommendation API
+- 内容平台的剧情风险标签 / 场景标签 SaaS
+- 片方宣发可购买**明确标识的 Sponsored Candidate**，但必须先通过用户 Hard Gate，不允许用商业权重突破雷点和平台限制。
 
-原因：
+---
 
-- 向量相似度是连续值，不适合表达“绝对不能恐怖”。
-- 时长、年份、平台是精确字段，不应该被语义近似。
-- 风险标签需要证据和置信度，不能被平均掉。
-- “恋爱片”和“烧脑片”在文本向量上可能接近，但用户说了恋爱片时不能因此越界。
+## 7. GTM 与冷启动
 
-当前 Demo 的职责拆分：
+### Phase 1：用“普通推荐做不到的问题”冷启动
 
-- Structured Feature：确定性边界
-- Sparse FTS / BM25：显式词和类别召回
-- 128d multilingual LSA：语义召回
-- Evidence Chunk：RAG 解释
+首批只打 3 个最容易形成认知的 Demo：
 
-生产版本可以替换成更强的 embedding 模型和向量数据库。维数由模型和检索效果决定，不是为了“百维”而人为平均池化。
+1. **“给我没有任何人死去的电影”**
+2. **“和爸妈看，不要尴尬”**
+3. **“只看爱奇艺，今晚替我选一个”**
 
-## 6. 数据如何存
+核心传播语不是“AI 推荐电影”，而是：
 
-### Demo
+> **你可以把真正难说清楚的观看条件直接告诉「影」。**
 
-- SQLite：影片主实体、结构化特征、Evidence、Vector
-- GitHub Pages：公开内容源 + curated fallback
-- Redis：可选 Session / Cache
+### Phase 2：内容冷启动
 
-### 生产建议
+- 先人工深标 300–500 部高频作品，保证 Plot Facts 准确性。
+- 国产新剧 / 新电影建立高时效 Curated Layer。
+- 与影视博主、公众号作者、播客主共建 Scene Card，而不是让他们只写传统影评。
 
-PostgreSQL / MySQL：
-- 内容主表
-- 可精确过滤的 Feature
-- 来源与版本
-- 平台可用性
-- Evidence 元数据
+### Phase 3：社媒增长
 
-pgvector / Qdrant / Milvus / Elasticsearch Vector：
-- content semantic embedding
-- evidence chunk embedding
+**小红书**：做“场景题”而非片单题，例如“求没有人死的治愈电影”。评论区直接收集真实自然语言 Query。  
+**B站 / 抖音**：短视频演示极端 Query → Agent 如何拆约束 → 为什么普通榜单会错。  
+**公众号**：发布场景型主题片单并嵌入 Scene Card。  
+**X / 海外**：用 trigger-aware / group movie night / decision fatigue 切海外场景。
 
-Redis：
-- session state
-- query cache
-- rate limit
-- 短生命周期 candidate cache
+### Phase 4：增长闭环
 
-Object Storage：
-- 原始数据快照
-- 离线中间产物
+```text
+社媒 Scene Case
+→ 打开预填 Query
+→ 首次推荐
+→ 收藏 / 分享
+→ 注册保存
+→ 生成个人 Scene Card
+→ 分享到社媒 / 群聊
+→ 新用户带着完整场景进入
+```
 
-不建议把完整影视主库全部以 JSON 塞进 Redis。Redis 更适合短生命周期状态；灵活字段可以使用 PostgreSQL JSONB，但关键可过滤字段仍应结构化。
+---
 
-## 7. RAG 是什么
+## 8. 北极星指标与质量指标
 
-RAG = Retrieval-Augmented Generation。
+**North Star：每周“成功完成观看决策”的用户数。**
 
-这个产品里要区分两种 Retrieval。
+代理指标：
 
-Candidate Retrieval 解决“哪些片值得进入候选池”，使用 Structured + Sparse + Dense。
-
-Evidence Retrieval 解决“为什么推荐它、有没有用户关心的雷点、这句话有没有依据”。
-
-Evidence RAG 的流程是：
-
-1. 已经选出候选影片；
-2. 按 content_id 检索该片的简介、官方描述、编辑标注、家长指南等 Evidence Chunk；
-3. 按 spoiler_level 过滤；
-4. LLM 只基于证据生成“为什么推荐 / 雷点 / 无剧透看点”。
-
-因此 RAG 不是整个推荐算法，而是推荐解释和内容理解的证据层。
-
-## 8. 数据源与 API 边界
-
-当前公开工程使用：
-
-- TVMaze API：剧集基础元数据、海报、类型、国家、时长、评分；
-- Wikidata SPARQL：电影和中国内容补充；
-- 可选 OpenAI API：只做 Soft Intent Enrichment。
-
-LLM 不得覆盖确定性 Hard Constraint。
-
-未来如果获得腾讯视频、爱奇艺、优酷、芒果 TV 等官方或授权接口，应通过统一 Adapter 接入。没有授权时只使用公开合法数据和来源链接，不通过绕过反爬机制取得数据。
-
-## 9. 全链路流程
-
-~~~mermaid
-flowchart TD
-    A[用户自然语言] --> B[Intent Compiler]
-    B --> C[SceneProfile]
-    C --> C1[Hard Constraints]
-    C --> C2[Soft Preferences]
-    C --> C3[Exploration Budget]
-
-    C1 --> D1[Structured Recall]
-    C2 --> D2[Sparse FTS / BM25]
-    C2 --> D3[Dense Semantic Recall]
-    D1 --> E[Candidate Union]
-    D2 --> E
-    D3 --> E
-
-    E --> F[Hard Gate]
-    F -->|不合法| X[Discard]
-    F -->|合法| G[Feature + Scene Rerank]
-
-    C3 --> H[Exploration Controller]
-    G --> H
-    H --> I[Top K]
-
-    I --> J[Evidence Retrieval]
-    J --> K[spoiler-safe RAG]
-    K --> L[Why / Watchouts / Surprise]
-    L --> M[用户反馈]
-    M --> N[Session / Preference Signals]
-~~~
-
-## 10. 召回和排序
-
-一个可调试 baseline：
-
-RetrievalScore = Sparse + Semantic + Structured + EvidenceQuality 的加权组合。
-
-进入 Hard Gate 后，RankScore 再加入：
-
-- Genre / RequiredSignal
-- Relationship
-- Mood / Tone / Pace
-- Scene Fit
-- Popularity Preference
-- Quality Preference
-- Risk Penalty
-
-Explore 模式额外引入 novelty、diversity 和 surprise，但 Hard Gate 始终在探索之前。
-
-## 11. “小众恋爱片”为什么不能推荐烧脑片
-
-正确解析：
-
-- content_type = movie
-- required_genres = Romance
-- relationship_focus = romantic
-- popularity_preference = niche
-- exploration_mode = precise
-
-执行：
-
-召回候选 → Romance Hard Gate → 非 Romance 全部删除 → 只在剩余恋爱片中按小众度、氛围、场景排序。
-
-因此即使一部烧脑悬疑片的 embedding 非常接近 Query，也没有资格进入结果。
-
-如果用户第二轮选择“想烧脑”，它只是对“合法恋爱电影”内部增加 thought_provoking 偏好，而不是取消 Romance 约束。
-
-## 12. 场景化为什么不是“多几个标签”
-
-产品真正的差异是 Context × Content。
-
-同一部片在不同场景下排序不同：
-
-- 家庭饭后：成人尺度、恐怖、尴尬风险权重显著提高；
-- 朋友聚会：喜剧 payoff、互动性和快节奏更重要；
-- 一个人睡前：低认知负担、温柔、治愈更重要；
-- 周末沉浸：长片、世界观、视觉奇观惩罚降低；
-- 通勤：单集时长和中断友好度更重要。
-
-## 13. 内容理解、雷点与惊喜
-
-每部内容至少维护三层。
-
-Entity / Metadata：
-片名、类型、年份、时长、国家、海报、平台。
-
-Content Intelligence：
-relationship、tone、pace、cognitive load、themes、risk tags、surprise dimension、popularity bucket。
-
-Evidence：
-每条 Risk / Surprise 至少包含 evidence_type、text、source_ref、confidence、spoiler_level。
-
-如果只有“类型 + 一句话简介”，系统必须明确显示证据不足，不能说“确定没有某类雷点”。
-
-## 14. 多轮澄清策略
-
-不应该每次固定追问三四题，而是只问信息增益最高的问题。
-
-例如用户说“我想看小众恋爱片”，已经确定电影、恋爱、小众，但不知道谁一起看，所以先问：
-
-“这次是自己看，还是和别人一起看？”
-
-下一轮再根据需要问：
-
-“更想轻松、刺激、治愈，还是烧脑？”
-
-当已有足够约束时直接推荐，不为了展示 Agent 而强行追问。
-
-## 15. API 设计
-
-Session：
-- POST /v1/sessions
-- GET /v1/sessions/{session_id}
-
-Chat：
-- POST /v1/sessions/{session_id}/chat
-- Response type：clarify / recommend / no_match
-
-Catalog：
-- GET /v1/catalog/search?q=
-- GET /v1/catalog/browse
-- GET /v1/content/{content_id}
-
-Debug：
-- GET /health
-- GET /v1/demo/meta
-- GET /v1/demo/feature-schema
-
-Feedback：
-- POST /v1/sessions/{session_id}/feedback
-
-## 16. AI 每个环节要调试什么
-
-| 环节 | 关键指标 |
-| --- | --- |
-| Intent | Hard constraint accuracy、slot accuracy、conflict detection |
-| Recall | Recall@K、source coverage、empty recall rate |
-| Hard Gate | constraint violation rate，目标 0 |
-| Rerank | NDCG、Top-K relevance、scene fit |
-| Exploration | diversity 上升且 constraint violation 仍为 0 |
-| Evidence | evidence coverage、unsupported-claim rate |
-| RAG | groundedness、spoiler violation、hallucination |
-| Multi-turn | clarification rate、turns-to-decision、abandonment |
-| Data | poster coverage、feature coverage、stale platform rate |
-
-每次新增规则都必须配 Eval Query，不靠“感觉调 Prompt”。
-
-## 17. 核心回归 Case
-
-1. “小众恋爱片” → Top K 全部 Romance。
-2. “悬疑，不要恐怖” → Horror violation = 0。
-3. “和朋友聚会，轻松好笑” → Comedy / funny signal 高覆盖。
-4. “一个人睡前，治愈，90 分钟内” → runtime violation = 0。
-5. “给我点惊喜，但不要恐怖” → 多样性提升但 Horror violation = 0。
-6. “像《功夫》一样好笑” → 相似性来自喜剧、节奏和风格，而不是只靠标题 embedding。
-
-## 18. 上线分层
-
-GitHub Pages 用于作品集体验：零密钥、可直接对话、公开 API + curated fallback、浏览器执行硬过滤和场景排序。
-
-Full Backend 用于工程展示和可扩展架构：FastAPI、SQLite / Postgres、Redis、Sparse + Dense Hybrid Recall、Hard Gate、Reranker、Evidence RAG、可选 OpenAI soft intent。
-
-两个版本共享同一原则：先守边界，再做探索。
+- 首次 Query → 收藏 / 平台跳转率
+- 推荐后继续追问率
+- 片单收藏率
+- Scene Card 复用率 / 分享率
+- D7 / D30 回访
+- Social Evidence 展开率
+- 指定平台命中率
+
+质量红线：
+
+- **Hard Constraint Violation Rate = 0**
+- 平台误报率
+- Plot Fact 错误率
+- Social Evidence 错绑作品率
+- 0 结果率与合理放宽率
+
+---
+
+## 9. 版本边界
+
+### 当前 Demo 已有
+
+- 场景对话
+- Plot Fact 硬约束
+- 2026 国产精选层
+- 100% 可渲染海报
+- Verified Platform Gate（Demo 已校准爱奇艺样本）
+- 多路召回 / Scene Vector / RRF
+- Social Evidence 后端接口与真实性评分框架
+- 本地账户、收藏片单、Scene Community Demo
+- Decision Mode
+
+### 下一版本 P0
+
+1. 将 3,339 条内容扩充为高覆盖 Plot Facts + Evidence。
+2. 增加真实平台可用性定时刷新。
+3. 配置百度 AI Search / X API 后上线 Social Evidence 实时检索。
+4. 将 Pages 本地账户切换到 FastAPI 服务端账户。
+5. 加入“看过 / 不喜欢 / 踩雷”反馈闭环。
+
+### P1
+
+- 多人 Group Consensus
+- 社区 Scene Card 发布与排序
+- 上线提醒 / 跨平台订阅
+- 个性化 Taste Map
+- 付费 Pro 与 B2B API
+
+---
+
+## 10. 外部接口依据
+
+- X Developer Docs：Recent Search / Posts Search 使用官方 API。
+- 百度 AI Search：`POST /v2/ai_search/web_search`，支持 Web Search、站点过滤和时效过滤。
+- 小红书开放平台公开入口目前以电商、店铺授权和工具型应用为主，因此本项目不设计绕过反爬的通用笔记抓取。
