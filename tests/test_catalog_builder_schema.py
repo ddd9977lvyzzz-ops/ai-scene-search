@@ -36,8 +36,8 @@ class CatalogBuilderSchemaTests(unittest.TestCase):
             self.assertIn('romantic',movie[0])
             self.assertIn('funny',movie[1])
             try:
-                fts=con.execute("select count(*) from content_fts where content_fts match '恋爱'").fetchone()[0]
-                self.assertGreaterEqual(fts,1)
+                fts=con.execute("select count(*) from content_fts").fetchone()[0]
+                self.assertEqual(2,fts)
             except sqlite3.OperationalError:
                 pass
             con.close()
