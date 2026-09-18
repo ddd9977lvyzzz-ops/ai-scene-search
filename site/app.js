@@ -2,7 +2,8 @@ const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const labels={solo:'自己看',family:'和家人',friends:'和朋友',couple:'和对象',weekend:'周末',party:'聚会',late_night:'睡前',meal:'饭后',light:'轻松',relaxing:'放松',healing:'治愈',funny:'好笑',exciting:'刺激',tense:'紧张',thought_provoking:'烧脑',romantic:'恋爱感',movie:'电影',series:'电视剧',variety:'综艺',animation:'动漫',documentary:'纪录片',low:'低负担',high:'高信息量',Romance:'恋爱/爱情',Comedy:'喜剧',Thriller:'悬疑',Mystery:'推理',Action:'动作',Horror:'恐怖',niche:'小众优先',mainstream:'热门优先',sweet:'偏甜',gentle:'温柔',realistic:'现实',bittersweet:'苦甜',dark:'偏暗黑',playful:'轻快',warm:'温暖',precise:'精准匹配',balanced:'适度探索',explore:'探索模式',no_character_death:'没有角色死亡',happy_ending:'明确偏圆满',no_animal_harm:'无动物伤害',no_infidelity:'无出轨主线',no_gore:'无血腥重点',no_jump_scares:'无跳吓重点',no_sexual_content:'无明显大尺度',family_safe:'家庭共看友好',closed_ending:'结局收束',romance_central:'恋爱主线',friendship_central:'友情主线',career_central:'事业成长',iqiyi:'爱奇艺',tencent_video:'腾讯视频',youku:'优酷',mango_tv:'芒果TV',netflix:'Netflix',disney_plus:'Disney+',max:'Max',prime_video:'Prime Video'};
 const starters=['我只看爱奇艺，想找2026年的国产剧','今晚一个人看，想轻松一点但不要太俗套','和朋友聚会，想看节奏快又好笑的电影','和爸妈一起看，想找轻松自然的国产片','像《功夫》一样有喜剧节奏，但换个题材','周末想看一部高信息量的悬疑片','最近想探索小众一点的华语电影','别给我列表，今晚直接替我选一部'];
-const state={catalog:[],profile:freshProfile(),seen:new Set(),busy:false,lastQuery:''};
+const CONFIG=window.YING_CONFIG||{apiBase:'',preferBackend:false,pagesPreview:true};
+const state={catalog:[],profile:freshProfile(),seen:new Set(),busy:false,lastQuery:'',backendReady:false,backendSession:null,agentMode:'local-retrieval'};
 const STORAGE_PREFIX='ying:v1:';
 const account={user:null,watchlist:[]};
 const COMMUNITY_SCENES=[
@@ -11,6 +12,72 @@ const COMMUNITY_SCENES=[
   {id:'weekday-90',title:'工作日 90 分钟以内',desc:'短时长、低认知负荷，适合下班后不想做复杂选择的时候。',tags:['≤90min','低负担','工作日'],prompt:'工作日晚上一个人看，90分钟以内，不想动脑'},
   {id:'friends-laugh',title:'朋友聚会先把气氛带起来',desc:'优先笑点密度与可打断性，不把高压剧情当成“刺激=适合聚会”。',tags:['朋友','好笑','可打断'],prompt:'和朋友聚会，想看轻松好笑的电影'}
 ];
+function apiUrl(path){const base=(CONFIG.apiBase||'').replace(/\/$/,'');return base+path}
+async function initBackend(){
+  if(!CONFIG.preferBackend||!CONFIG.apiBase)return false;
+  try{
+    const r=await fetch(apiUrl('/health'),{headers:{Accept:'application/json'}});
+    if(!r.ok)return false;
+    const data=await r.json();
+    state.backendReady=Boolean(data.openai_agent_enabled);
+    state.agentMode=data.agent_mode||'backend';
+    return state.backendReady;
+  }catch(e){return false}
+}
+async function ensureBackendSession(){
+  if(!state.backendReady)return null;
+  if(state.backendSession)return state.backendSession;
+  const r=await fetch(apiUrl('/v1/sessions'),{method:'POST',headers:{'Content-Type':'application/json'}});
+  if(!r.ok)throw new Error('session_create_failed');
+  const data=await r.json();state.backendSession=data.session_id;return state.backendSession;
+}
+function syncProfileFromBackend(p,plan){
+  if(!p)return;
+  state.profile={
+    contentTypes:arr(p.content_types),requiredGenres:arr(p.required_genres),avoidGenres:arr(p.avoid_genres),
+    requiredSignals:arr(p.required_signals),avoidRisks:arr(p.avoid_risks),requiredFacts:arr(p.required_facts),
+    avoidFacts:arr(p.avoid_facts),moods:arr(p.moods),relationship:arr(p.relationship_focus),
+    tone:arr(p.tone_preferences),pace:arr(p.pace_preferences),companions:p.companions||null,scene:p.scene||null,
+    cognitive:p.cognitive_load||null,popularity:p.popularity_preference||null,language:p.language||null,
+    runtimeMax:p.runtime_max||null,yearMin:p.year_min||null,platform:arr(p.platforms)[0]||null,
+    explore:(p.exploration_mode||'precise')!=='precise',pickOne:(plan&&plan.decision_style)==='pick_one',
+    sourceReference:p.source_reference||null
+  };
+  profileChips();
+}
+function backendItem(r){
+  const x={
+    id:r.content_id,t:r.title,ct:r.content_type,y:r.release_year,rt:r.runtime_minutes,g:arr(r.genres),
+    p:r.poster_url||'',pl:arr(r.platforms),to:arr(r.tone_tags),sn:arr(r.surprises),rn:arr(r.watchouts),
+    pb:r.popularity_bucket||'unknown',uc:r.evidence_level||.75,backendWhy:r.why||'',src:'canonical FastAPI catalog'
+  };
+  const existing=state.catalog.findIndex(v=>v.id===x.id);
+  if(existing>=0)state.catalog[existing]={...state.catalog[existing],...x};else state.catalog.unshift(x);
+  return x;
+}
+async function backendChat(text){
+  const sid=await ensureBackendSession();
+  const r=await fetch(apiUrl('/v1/sessions/'+encodeURIComponent(sid)+'/chat'),{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})
+  });
+  if(!r.ok){const msg=await r.text();throw new Error(msg||('HTTP '+r.status))}
+  return await r.json();
+}
+function renderBackendResponse(data){
+  syncProfileFromBackend(data.profile,data.llm_plan);
+  if(data.type==='clarify'){
+    renderClarify({question:data.question,options:arr(data.options)});
+    return;
+  }
+  if(data.type==='no_match'){
+    const html='<div class="turn-agent"><div class="agent-avatar">影</div><div><p class="agent-intro">'+esc(data.suggestion||'这组条件暂时没有可靠候选。')+'</p></div></div>';
+    $('#messages').insertAdjacentHTML('beforeend',html);profileChips();scrollEnd();return;
+  }
+  const items=arr(data.results).map(backendItem);
+  render(items,data.assistant_message||data.decision_summary||null);
+  const actions=arr(data.follow_up_suggestions).length?data.follow_up_suggestions:data.quick_actions;
+  if(actions&&actions.length)$('#quick-actions').innerHTML=actions.slice(0,6).map(x=>'<button type="button" data-prompt="'+esc(x)+'">'+esc(x)+'</button>').join('');
+}
 function storeGet(key,fallback){try{const v=localStorage.getItem(STORAGE_PREFIX+key);return v?JSON.parse(v):fallback}catch(e){return fallback}}
 function storeSet(key,value){try{localStorage.setItem(STORAGE_PREFIX+key,JSON.stringify(value))}catch(e){}}
 function accountKey(){return account.user&&account.user.email?'watchlist:'+account.user.email:'watchlist:guest'}
@@ -267,7 +334,7 @@ function profileChipData(){
   p.avoidRisks.forEach(v=>add('avoidRisks',v,v==='emotionally_heavy'?'不要太虐':v==='fear_or_horror'?'不要惊吓':`避开 ${labels[v]||v}`));
   const seen=new Set();return chips.filter(x=>{const k=x.key+'|'+x.value;if(seen.has(k))return false;seen.add(k);return true});
 }
-function removeProfileFilter(key,value){
+async function removeProfileFilter(key,value){
   const p=state.profile;
   const arrays=new Set(['moods','contentTypes','requiredGenres','relationship','pace','requiredFacts','avoidGenres','avoidRisks']);
   if(arrays.has(key))p[key]=p[key].filter(x=>String(x)!==String(value));
@@ -275,6 +342,14 @@ function removeProfileFilter(key,value){
   else if(key==='pickOne'||key==='explore')p[key]=false;
   else if(Object.prototype.hasOwnProperty.call(p,key))p[key]=null;
   profileChips();toast('已移除条件');
+  if(state.backendReady&&state.backendSession){
+    try{
+      const r=await fetch(apiUrl('/v1/sessions/'+encodeURIComponent(state.backendSession)+'/profile/remove'),{
+        method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value})
+      });
+      if(r.ok){const data=await r.json();syncProfileFromBackend(data.profile,null)}
+    }catch(e){console.warn('profile remove sync failed',e)}
+  }
 }
 function profileChips(){
   const chips=profileChipData(), n=$('#active-profile');
@@ -292,7 +367,7 @@ function card(x,i){
   const sn=arr(x.sn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
   const fallback=generatedPoster(x), poster=posterFor(x);
   const proof=state.profile.requiredFacts.length?`<p class="rec-proof"><b>剧情边界</b>${state.profile.requiredFacts.map(f=>esc(labels[f]||f)).join(' · ')} <span>✓</span></p>`:'';
-  return `<article class="rec-card"><img class="rec-poster" src="${esc(poster)}" data-fallback="${esc(fallback)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.onerror=null;this.src=this.dataset.fallback"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}${platformText?`<span class="platform-pill">${esc(platformText)}</span>`:''}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(reason(x))}</p>${proof}${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><p class="rec-source">召回：Hard Gate + 稀疏召回 + Scene Vector + Semantic / RRF</p><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button><button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏'}</button></div></article>`;
+  return `<article class="rec-card"><img class="rec-poster" src="${esc(poster)}" data-fallback="${esc(fallback)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.onerror=null;this.src=this.dataset.fallback"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}${platformText?`<span class="platform-pill">${esc(platformText)}</span>`:''}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(x.backendWhy||reason(x))}</p>${proof}${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><p class="rec-source">召回：Hard Gate + 稀疏召回 + Scene Vector + Semantic / RRF</p><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button><button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏'}</button></div></article>`;
 }
 function socialDiscovery(items){
   if(!items.length)return '';
@@ -323,8 +398,8 @@ async function loadSocialContext(id,button){
   }catch(e){if(box)box.innerHTML='<p>联网观点暂不可用；推荐本身仍按内容硬边界返回。</p>'}
   finally{if(button){button.disabled=false;button.textContent='刷新联网口碑'}}
 }
-function render(items){
-  const intro=items.length?'我先锁住平台、剧情事实和风险边界，再做多路召回。社媒热度只影响合法候选内部的排序，不会把别的平台或踩雷内容推回来。':'这组条件没有足够确定的候选，我不会把“未知”冒充“满足”。下面给出最接近但没过线的原因。';
+function render(items,introOverride=null){
+  const intro=introOverride||(items.length?'我先锁住平台、剧情事实和风险边界，再做多路召回。社媒热度只影响合法候选内部的排序，不会把别的平台或踩雷内容推回来。':'这组条件没有足够确定的候选，我不会把“未知”冒充“满足”。下面给出最接近但没过线的原因。');
   let body='';
   if(items.length){
     body=`<div class="recommend-list">${items.map(card).join('')}</div>${socialDiscovery(items)}`;
@@ -339,7 +414,22 @@ function render(items){
   $('#quick-actions').classList.remove('hidden');scrollEnd();
 }
 function scrollEnd(){requestAnimationFrame(()=>window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}))}
-async function sendMessage(text){text=(text||'').trim();if(!text||state.busy)return;state.busy=true;$('#send').disabled=true;addUser(text);$('#message-input').value='';parse(text);const clarify=nextClarification();if(clarify){renderClarify(clarify);}else{render(recommend());}state.busy=false;$('#send').disabled=false;}
+async function sendMessage(text){
+  text=(text||'').trim();if(!text||state.busy)return;
+  state.busy=true;$('#send').disabled=true;addUser(text);$('#message-input').value='';
+  try{
+    if(state.backendReady){
+      const data=await backendChat(text);renderBackendResponse(data);
+    }else{
+      parse(text);const clarify=nextClarification();
+      if(clarify)renderClarify(clarify);else render(recommend());
+    }
+  }catch(e){
+    console.error(e);toast('AI 后端暂不可用，已切到本地检索预览');
+    state.backendReady=false;parse(text);const clarify=nextClarification();
+    if(clarify)renderClarify(clarify);else render(recommend());
+  }finally{state.busy=false;$('#send').disabled=false}
+}
 function openDetail(id){
   const x=state.catalog.find(v=>v.id===id);if(!x)return;
   const risks=arr(x.rn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
@@ -350,7 +440,7 @@ function openDetail(id){
   $('#detail-body').innerHTML=`<div class="detail"><img src="${esc(posterFor(x))}" data-fallback="${esc(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${esc(x.t)} 海报"><div><small>${esc([x.y,labels[x.ct],(x.rt||x.ert)?(x.rt||x.ert)+' 分钟':null].filter(Boolean).join(' · '))}</small><h2>${esc(x.t)}</h2><p>${esc(x.d||'暂无简介')}</p><p><strong>平台快照：</strong>${platforms.length?esc(platforms.join(' / ')):'未验证；指定平台时不会把未知当作可用'}</p><p><strong>类型：</strong>${arr(x.g).map(esc).join(' / ')||'未标注'}</p><p><strong>氛围：</strong>${arr(x.to).map(v=>esc(labels[v]||v)).join(' / ')||'暂无'}</p>${facts.length?`<p><strong>结构化剧情事实：</strong>${esc(facts.join(' / '))}</p>`:'<p><strong>结构化剧情事实：</strong>当前证据不足，不把“未知”当成“没有”。</p>'}${risks.length?`<p><strong>可能雷点：</strong>${esc(risks.slice(0,5).join(' / '))}</p>`:'<p><strong>可能雷点：</strong>证据不足，不等于确定没有雷点。</p>'}${surprises.length?`<p><strong>无剧透看点：</strong>${esc(surprises.slice(0,5).join(' / '))}</p>`:''}<button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏到我的片单'}</button><p><small>内容理解置信度：${Math.round((x.uc||0)*100)}% · 数据层：${esc(x.src||'curated / public metadata')}</small></p></div></div>`;
   $('#detail-dialog').showModal();
 }
-function reset(){state.profile=freshProfile();state.seen.clear();state.lastQuery='';$('#messages').innerHTML='';$('#conversation').classList.add('hidden');$('#welcome').classList.remove('hidden');$('#active-profile').classList.add('hidden');$('#quick-actions').classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'})}
+function reset(){state.profile=freshProfile();state.seen.clear();state.lastQuery='';state.backendSession=null;$('#messages').innerHTML='';$('#conversation').classList.add('hidden');$('#welcome').classList.remove('hidden');$('#active-profile').classList.add('hidden');$('#quick-actions').classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'})}
 const FALLBACK_ITEMS=[
 {id:"seed:ljx",t:"临江仙",ct:"series",y:2025,co:["中国大陆"],g:["Drama","Romance"],d:"相爱相杀的仙侠关系线，重点在误解、共同经历与关系修复。",ert:45,p:"https://static.tvmaze.com/uploads/images/original_untouched/571/1429084.jpg",sc:["solo"],em:["romantic"],cl:"medium",pa:["moderate"],ri:["romance_theme"],re:["romantic"],to:["romantic"],pb:"low",uc:.82},
 {id:"seed:wzxh",t:"我只喜欢你",ct:"series",y:2019,co:["中国大陆"],g:["Drama","Romance"],d:"从校园到职场的成长型恋爱故事，关系线是明确主轴。",ert:45,p:"https://static.tvmaze.com/uploads/images/original_untouched/198/495887.jpg",sc:["solo"],em:["romantic"],cl:"medium",pa:["moderate"],ri:["romance_theme"],re:["romantic"],to:["romantic","warm"],pb:"low",uc:.82},
