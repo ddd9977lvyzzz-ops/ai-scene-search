@@ -5,6 +5,7 @@
   window.YING_CONFIG = {
     apiBase: explicit || (onPages ? '' : location.origin),
     preferBackend: true,
-    pagesPreview: onPages,
+    requireBackend: !onPages || Boolean(explicit),
+    pagesPreview: onPages && !explicit,
   };
 })();
