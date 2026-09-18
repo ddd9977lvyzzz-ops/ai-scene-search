@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 CATALOG_DB = os.getenv('CATALOG_DB', str(BASE_DIR / 'db' / 'catalog.sqlite3'))
 SESSION_DB = os.getenv('SESSION_DB', str(BASE_DIR / 'db' / 'session.sqlite3'))
 EVENT_DB = os.getenv('EVENT_DB', str(BASE_DIR / 'db' / 'events.sqlite3'))
-WEB_DIR = BASE_DIR / 'web'
+WEB_DIR = BASE_DIR / 'site'
 
 if os.getenv('SESSION_BACKEND','sqlite').lower() == 'redis' and os.getenv('REDIS_URL'):
     store = RedisSessionStore(os.environ['REDIS_URL'], int(os.getenv('SESSION_TTL_SECONDS','604800')))
