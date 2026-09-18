@@ -2,6 +2,26 @@ from __future__ import annotations
 import argparse, json, sqlite3
 from datetime import datetime, timezone
 
+
+# High-precision demo overrides. These are intentionally sparse: unknown is not treated as safe.
+# The goal is to make plot-fact queries demonstrable without pretending every title has scene-level evidence.
+CURATED_FACT_OVERRIDES = {
+    '实习生': {'no_character_death': True, 'no_gore': True, 'no_jump_scares': True, 'family_safe': True, 'closed_ending': True},
+    'The Intern': {'no_character_death': True, 'no_gore': True, 'no_jump_scares': True, 'family_safe': True, 'closed_ending': True},
+    '落魄大厨': {'no_character_death': True, 'happy_ending': True, 'no_gore': True, 'no_jump_scares': True, 'closed_ending': True},
+    'Chef': {'no_character_death': True, 'happy_ending': True, 'no_gore': True, 'no_jump_scares': True, 'closed_ending': True},
+    '律政俏佳人': {'no_character_death': True, 'happy_ending': True, 'no_gore': True, 'no_jump_scares': True, 'closed_ending': True},
+    'Legally Blonde': {'no_character_death': True, 'happy_ending': True, 'no_gore': True, 'no_jump_scares': True, 'closed_ending': True},
+    '摇滚校园': {'no_character_death': True, 'no_gore': True, 'no_jump_scares': True, 'family_safe': True, 'closed_ending': True},
+    'School of Rock': {'no_character_death': True, 'no_gore': True, 'no_jump_scares': True, 'family_safe': True, 'closed_ending': True},
+    '帕丁顿熊2': {'no_character_death': True, 'happy_ending': True, 'no_gore': True, 'no_jump_scares': True, 'family_safe': True, 'closed_ending': True},
+    'Paddington 2': {'no_character_death': True, 'happy_ending': True, 'no_gore': True, 'no_jump_scares': True, 'family_safe': True, 'closed_ending': True},
+    '魔女宅急便': {'no_character_death': True, 'no_gore': True, 'no_jump_scares': True, 'family_safe': True, 'closed_ending': True},
+    "Kiki's Delivery Service": {'no_character_death': True, 'no_gore': True, 'no_jump_scares': True, 'family_safe': True, 'closed_ending': True},
+    '年会不能停！': {'no_character_death': True, 'no_gore': True, 'no_jump_scares': True, 'closed_ending': True},
+    '年会不能停!': {'no_character_death': True, 'no_gore': True, 'no_jump_scares': True, 'closed_ending': True},
+}
+
 def j(v,fallback):
     try:return json.loads(v or '')
     except Exception:return fallback
@@ -52,7 +72,17 @@ def infer(row,pop_bucket):
     if 'family' in relationships:central.append('family relationship')
     if 'friendship' in relationships:central.append('friendship')
     facts={'central_relationships':central,'themes':themes[:8],'watching_experience':uniq([*emotions,*pace])[:10],'known_limits':'Derived from available synopsis/genre metadata. Specific scene-level triggers require richer licensed evidence.'}
-    provenance=j(row['tag_provenance_json'],{}); evidence={'canonical_source':row['source'],'source_url':row['source_url'],'method':'deterministic_content_intelligence_v1','metadata_layer_method':provenance.get('method','source_or_rule_metadata'),'metadata_layer_note':provenance.get('note')}
+    # Conservative positive facts. Absence of a risk never becomes a strong “no X” claim unless
+    # a title is in the curated override set or the signal is structurally safe enough for demo use.
+    if 'romantic' in relationships:facts['romance_central']=True
+    if 'friendship' in relationships:facts['friendship_central']=True
+    if 'family' in genres and not any(g in genres for g in ['horror','crime','war']):
+        facts['family_safe']=True
+        facts['no_jump_scares']=True
+    if not any(g in genres for g in ['horror','crime','war','action']) and 'violence_possible' not in risks:
+        facts['no_gore']=True
+    facts.update(CURATED_FACT_OVERRIDES.get(title,{}))
+    provenance=j(row['tag_provenance_json'],{}); evidence={'canonical_source':row['source'],'source_url':row['source_url'],'method':'deterministic_content_intelligence_v1.2_plot_facts','metadata_layer_method':provenance.get('method','source_or_rule_metadata'),'metadata_layer_note':provenance.get('note')}
     return uniq(tones),uniq(surprises),facts,risk_notes,surprise_notes,round(confidence,3),evidence
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--db',default='db/catalog.sqlite3');args=ap.parse_args()
@@ -62,8 +92,8 @@ def main():
     for r in rows:
         pb=bucket(r['popularity'],r['content_type'],cuts);tones,surprises,facts,risk_notes,surprise_notes,conf,evidence=infer(r,pb);summary=(r['overview'] or '').strip()
         if len(summary)>420:summary=summary[:417].rsplit(' ',1)[0]+'…'
-        payload.append((r['content_id'],'1.0',summary,json.dumps(tones,ensure_ascii=False),json.dumps(surprises,ensure_ascii=False),json.dumps(facts,ensure_ascii=False),json.dumps(risk_notes,ensure_ascii=False),json.dumps(surprise_notes,ensure_ascii=False),pb,conf,json.dumps(evidence,ensure_ascii=False),now))
+        payload.append((r['content_id'],'1.2',summary,json.dumps(tones,ensure_ascii=False),json.dumps(surprises,ensure_ascii=False),json.dumps(facts,ensure_ascii=False),json.dumps(risk_notes,ensure_ascii=False),json.dumps(surprise_notes,ensure_ascii=False),pb,conf,json.dumps(evidence,ensure_ascii=False),now))
     con.executemany('INSERT OR REPLACE INTO content_intelligence VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',payload)
-    con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",('content_intelligence_version','1.0'));con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",('content_intelligence_count',str(len(payload))))
-    con.commit();con.close();print(json.dumps({'content_intelligence':len(payload),'schema_version':'1.0'},ensure_ascii=False))
+    con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",('content_intelligence_version','1.2'));con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",('content_intelligence_count',str(len(payload))))
+    con.commit();con.close();print(json.dumps({'content_intelligence':len(payload),'schema_version':'1.2'},ensure_ascii=False))
 if __name__=='__main__':main()
