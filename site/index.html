@@ -4,20 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="AI 场景化影视决策 Agent：基于场景、情绪、关系、雷点和探索边界推荐影视内容">
-  <title>此刻看什么｜AI 场景搜</title>
+  <title>影｜AI 场景影视 Agent</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
-<body data-build="2026-09-18-pages-v2">
+<body data-build="2026-09-18-pages-v3">
   <header class="topbar">
-    <a class="brand" href="./" aria-label="此刻看什么首页"><span class="brand-mark">此刻</span><span>看什么</span></a>
+    <a class="brand" href="./" aria-label="影首页"><span class="brand-mark">影</span><span>YING</span></a>
     <div class="top-actions">
       <span class="catalog-status" id="catalog-status"><i></i>正在加载在线内容库</span>
+      <button class="quiet-button" id="community-button" type="button">社区</button>
+      <button class="quiet-button" id="collection-button" type="button">收藏</button>
+      <button class="quiet-button account-button" id="account-button" type="button">登录</button>
       <button class="quiet-button" id="new-chat" type="button">新对话</button>
     </div>
   </header>
   <main class="agent-shell">
     <section class="welcome" id="welcome">
-      <p class="eyebrow">SCENE-AWARE MOVIE AGENT</p>
+      <p class="eyebrow">YING · SCENE DECISION AGENT</p>
       <h1>今晚，想看什么？</h1>
       <p class="lede">不用先想片名，也不用只说“爱情 / 悬疑”。你可以直接说人类真正会在意的边界：<strong>不要有人死、别出轨、不要跳吓、和爸妈看别尴尬、今晚脑子不想转</strong>。Agent 会先确认“能不能看”，再判断“适不适合此刻”。</p><div class="capability-strip"><span>剧情事实约束</span><span>雷点硬过滤</span><span>场景向量</span><span>相似作品探索</span><span>近似失败解释</span></div>
       <div class="starter-grid" id="starter-grid" aria-label="示例问题"></div>
@@ -30,13 +33,37 @@
         <button class="send" id="send" type="submit" aria-label="发送">发送</button>
       </form>
       <div class="quick-actions hidden" id="quick-actions"></div>
-      <p class="footnote">GitHub Pages 作品集模式：浏览器加载公开内容库并执行硬过滤与场景重排；外部数据失败时自动使用精选兜底片单。完整 3,339 条 FastAPI 版本包含向量召回、Evidence RAG 与会话存储。</p>
+      <p class="footnote">Pages Demo：场景决策、收藏与本地账户可直接体验；实时社媒检索在生产后端通过官方 API / 合规 Web Search 接入。完整工程包含 3,339 条内容、RRF 多路召回、Evidence RAG 与会话存储。</p>
     </section>
     <details class="system-note">
       <summary>数据与检索说明</summary>
       <div class="system-grid"><p id="data-note">在线 Demo：公开内容源 + 2026 国产精选 + 安全事实样本 · 完整工程：3,339 条内容</p><p>Hard Gate → 稀疏召回 → 场景向量 → RRF/排序 → Evidence</p></div>
     </details>
   </main>
+
+  <dialog class="sheet-dialog" id="auth-dialog">
+    <button class="dialog-close" id="auth-close" type="button" aria-label="关闭">×</button>
+    <div class="sheet-head"><p class="eyebrow">YING ACCOUNT</p><h2>保存你的观看偏好</h2><p>作品集 Demo 使用浏览器本地账户；正式版使用服务端账号体系，不在前端保存密码。</p></div>
+    <form class="auth-form" id="auth-form">
+      <label>昵称<input id="auth-name" maxlength="20" placeholder="例如：Jing" required></label>
+      <label>邮箱<input id="auth-email" type="email" placeholder="you@example.com" required></label>
+      <button class="primary-action" type="submit">登录 / 创建本地 Demo 账户</button>
+    </form>
+    <p class="privacy-note">本地 Demo 数据只保存在当前浏览器 localStorage，可随时退出并清除。</p>
+  </dialog>
+
+  <dialog class="sheet-dialog wide-sheet" id="collection-dialog">
+    <button class="dialog-close" id="collection-close" type="button" aria-label="关闭">×</button>
+    <div class="sheet-head"><p class="eyebrow">MY WATCHLIST</p><h2>我的片单</h2><p>收藏不是终点。后续推荐会把你主动保存的作品视为弱偏好信号，而不是硬标签。</p></div>
+    <div id="collection-body" class="collection-grid"></div>
+  </dialog>
+
+  <dialog class="sheet-dialog wide-sheet" id="community-dialog">
+    <button class="dialog-close" id="community-close" type="button" aria-label="关闭">×</button>
+    <div class="sheet-head"><p class="eyebrow">SCENE COMMUNITY</p><h2>大家在什么场景下看</h2><p>社区不是影评广场，而是把“场景 + 边界 + 片单”沉淀成可复用的观看方案。</p></div>
+    <div id="community-body" class="community-grid"></div>
+  </dialog>
+
   <dialog class="detail-dialog" id="detail-dialog"><button class="dialog-close" id="detail-close" type="button" aria-label="关闭">×</button><div id="detail-body"></div></dialog>
   <div class="toast" id="toast" role="status"></div>
   <script src="./app.js" defer></script>
