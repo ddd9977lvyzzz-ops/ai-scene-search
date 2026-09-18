@@ -21,8 +21,9 @@ def healthy() -> bool:
         records=int(con.execute('select count(*) from content').fetchone()[0])
         vectors=int(con.execute('select count(*) from content_vectors').fetchone()[0])
         intelligence=int(con.execute('select count(*) from content_intelligence').fetchone()[0])
+        platform_rows=int(con.execute('select count(*) from platform_availability').fetchone()[0])
         con.close()
-        return records>=1000 and vectors==records and intelligence==records
+        return records>=1000 and vectors==records and intelligence==records and platform_rows>=0
     except Exception:
         return False
 
@@ -38,6 +39,7 @@ def main():
         '--min-records',os.getenv('MIN_RECORDS','1000'),
         '--min-china-series',os.getenv('MIN_CHINA_SERIES','120'))
     run(sys.executable,'scripts/migrate_content_intelligence.py','--db',str(DB))
+    run(sys.executable,'scripts/migrate_platform_availability.py','--db',str(DB))
     run(sys.executable,'scripts/migrate_evidence_corpus.py','--db',str(DB))
     run(sys.executable,'scripts/build_embeddings.py','--db',str(DB),'--model',str(MODEL),'--dim',os.getenv('EMBEDDING_DIM','128'))
     run(sys.executable,'scripts/verify_catalog.py','--db',str(DB),
