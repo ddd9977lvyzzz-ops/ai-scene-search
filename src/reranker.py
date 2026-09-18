@@ -119,6 +119,7 @@ def rerank(cands:list[Candidate], p:SceneProfile, top_k:int=5):
         popularity=_pop_score(c,p); quality=0.5 if p.quality_preference!='acclaimed' else max(0.15,min(1.0,((c.rating_score or 5.2)-5)/4))
         freshness=0.5 if not c.release_year else max(0,min(1,(c.release_year-1990)/36))
         evidence=max(0.0,min(1.0,c.understanding_confidence or 0.35)); metadata=_metadata_quality(c)
+        social=max(0.0,min(1.0,c.social_score))*max(0.0,min(1.0,c.social_confidence))
         features=[]
         if p.genres: features.append((genre,1.55))
         if p.required_signals: features.append((req_signal,1.55))
@@ -134,13 +135,14 @@ def rerank(cands:list[Candidate], p:SceneProfile, top_k:int=5):
         if p.quality_preference: features.append((quality,0.7))
         pref=(sum(v*w for v,w in features)/sum(w for _,w in features)) if features else 0.5
         penalty=_risk_penalty(c,p)
-        final=0.33*c.score+0.49*pref+0.08*evidence+0.07*metadata+0.03*freshness-penalty
+        # Social proof is deliberately weak: max ~5% contribution, never a hard gate.
+        final=0.31*c.score+0.47*pref+0.08*evidence+0.06*metadata+0.03*freshness+0.05*social-penalty
         if p.exploration_mode=='explore':
             alpha=max(0.0,min(1.0,p.exploration_strength)); final=(1-alpha*0.20)*final+alpha*0.14*_novelty(c)+alpha*0.06*surprise
         elif p.exploration_mode=='balanced':
             alpha=max(0.0,min(1.0,p.exploration_strength)); final=(1-alpha*0.10)*final+alpha*0.07*_novelty(c)+alpha*0.03*surprise
         c.score=max(0.0,min(1.0,round(final,4)))
-        c.score_breakdown.update({'rank_pref':round(pref,3),'rank_genre':round(genre,3),'rank_required_signal':round(req_signal,3),'rank_relationship':round(relationship,3),'rank_mood':round(mood,3),'rank_tone':round(tone,3),'rank_pace':round(pace,3),'rank_scene':round(scene,3),'rank_audience':round(audience,3),'rank_popularity':round(popularity,3),'rank_surprise':round(surprise,3),'rank_evidence':round(evidence,3),'rank_metadata':round(metadata,3),'risk_penalty':round(penalty,3),'exploration':round(p.exploration_strength,3)})
+        c.score_breakdown.update({'rank_pref':round(pref,3),'rank_genre':round(genre,3),'rank_required_signal':round(req_signal,3),'rank_relationship':round(relationship,3),'rank_mood':round(mood,3),'rank_tone':round(tone,3),'rank_pace':round(pace,3),'rank_scene':round(scene,3),'rank_audience':round(audience,3),'rank_popularity':round(popularity,3),'rank_surprise':round(surprise,3),'rank_evidence':round(evidence,3),'rank_metadata':round(metadata,3),'rank_social':round(social,3),'risk_penalty':round(penalty,3),'exploration':round(p.exploration_strength,3)})
     ordered=sorted(cands,key=lambda x:x.score,reverse=True)
     dedup=[]; seen_titles=set()
     for c in ordered:
