@@ -71,7 +71,7 @@ class CatalogService:
 
     def quality_stats(self) -> dict[str, Any]:
         total=self.count()
-        poster=int(self.con.execute("SELECT COUNT(*) FROM content WHERE poster_url IS NOT NULL AND TRIM(poster_url)<>''").fetchone()[0])
+        poster=int(self.con.execute("SELECT COUNT(*) FROM content WHERE poster_url LIKE 'https://%' OR poster_url LIKE 'http://%'").fetchone()[0])
         desc=int(self.con.execute("SELECT COUNT(*) FROM content WHERE overview IS NOT NULL AND TRIM(overview)<>''").fetchone()[0])
         try: vectors=int(self.con.execute('SELECT COUNT(*) FROM content_vectors').fetchone()[0])
         except Exception: vectors=0
@@ -79,14 +79,17 @@ class CatalogService:
         except Exception: intel=0
         try: evidence=int(self.con.execute('SELECT COUNT(*) FROM content_evidence').fetchone()[0])
         except Exception: evidence=0
-        platform_rows=int(self.con.execute("SELECT COUNT(*) FROM content WHERE origin_platforms_json IS NOT NULL AND origin_platforms_json<>'[]'").fetchone()[0])
+        try:
+            platform_rows=int(self.con.execute("SELECT COUNT(DISTINCT content_id) FROM platform_availability WHERE status='available' AND confidence>=0.75").fetchone()[0])
+        except Exception:
+            platform_rows=0
         movie_total=int(self.con.execute("SELECT COUNT(*) FROM content WHERE content_type='movie'").fetchone()[0])
         movie_genre=int(self.con.execute("""SELECT COUNT(*) FROM content WHERE content_type='movie' AND lower(genres_json) NOT IN ('["film"]','[]')""").fetchone()[0])
         meta={}
         try: meta={r[0]:r[1] for r in self.con.execute('SELECT key,value FROM catalog_meta').fetchall()}
         except Exception: pass
         return {
-            'records': total, 'poster_coverage': round(poster/max(total,1),4), 'description_coverage': round(desc/max(total,1),4),
+            'records': total, 'poster_coverage': round(poster/max(total,1),4), 'real_poster_records':poster, 'description_coverage': round(desc/max(total,1),4),
             'vectors': vectors, 'embedding_coverage': round(vectors/max(total,1),4), 'content_intelligence':intel,
             'content_intelligence_coverage':round(intel/max(total,1),4), 'evidence_chunks':evidence,
             'platform_evidence_records':platform_rows, 'platform_evidence_coverage':round(platform_rows/max(total,1),4),
