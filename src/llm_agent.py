@@ -59,9 +59,15 @@ ANSWER_SCHEMA = {
 
 class LLMAgentBrain:
     def __init__(self):
-        self.api_key=os.getenv("OPENAI_API_KEY","").strip()
-        self.model=os.getenv("OPENAI_AGENT_MODEL","gpt-5.6-terra").strip()
-        self.base_url=os.getenv("OPENAI_BASE_URL","").strip() or None
+        self.openai_api_key=os.getenv("OPENAI_API_KEY","").strip()
+        self.gateway_api_key=os.getenv("AI_GATEWAY_API_KEY","").strip()
+        self.vercel_oidc=os.getenv("VERCEL_OIDC_TOKEN","").strip()
+        self.use_vercel_gateway=bool(self.gateway_api_key or self.vercel_oidc or os.getenv("VERCEL"))
+        self.api_key=(self.gateway_api_key or self.vercel_oidc) if self.use_vercel_gateway else self.openai_api_key
+        default_model="openai/gpt-5.6-luna" if self.use_vercel_gateway else "gpt-5.6-terra"
+        self.model=os.getenv("OPENAI_AGENT_MODEL",default_model).strip()
+        default_base="https://ai-gateway.vercel.sh/v1" if self.use_vercel_gateway else ""
+        self.base_url=os.getenv("OPENAI_BASE_URL",default_base).strip() or None
         self.enabled_flag=os.getenv("OPENAI_AGENT_ENABLED","1").strip().lower() in {"1","true","yes"}
         self.required=os.getenv("OPENAI_AGENT_REQUIRED","0").strip().lower() in {"1","true","yes"}
         self._client=None
@@ -73,16 +79,19 @@ class LLMAgentBrain:
     @property
     def mode(self) -> str:
         if self.enabled:
-            return f"openai-responses:{self.model}"
+            provider="vercel-ai-gateway" if self.use_vercel_gateway else "openai-responses"
+            return f"{provider}:{self.model}"
         return "deterministic-fallback"
 
     def _client_or_raise(self):
         if not self.enabled:
             if self.required:
-                raise RuntimeError("OPENAI_AGENT_REQUIRED=1 but OPENAI_API_KEY is missing")
+                raise RuntimeError("AI agent required but no OpenAI API key, AI Gateway key, or Vercel OIDC token is available")
             return None
         if self._client is None:
             from openai import OpenAI
+            # On Vercel, VERCEL_OIDC_TOKEN is injected automatically and authenticates AI Gateway.
+            # Outside Vercel, OPENAI_API_KEY keeps direct OpenAI Responses API support.
             self._client=OpenAI(api_key=self.api_key,base_url=self.base_url)
         return self._client
 
