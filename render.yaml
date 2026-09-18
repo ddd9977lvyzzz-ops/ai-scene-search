@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ai-scene-search
+    runtime: docker
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: CATALOG_DB
+        value: /app/db/catalog.sqlite3
+      - key: SESSION_DB
+        value: /tmp/scene_session.sqlite3
+      - key: EVENT_DB
+        value: /tmp/scene_events.sqlite3
+      - key: SESSION_BACKEND
+        value: sqlite
+      - key: OPENAI_INTENT_ENABLED
+        value: '0'
