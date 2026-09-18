@@ -18,10 +18,11 @@ from .features import public_feature_schema
 from .user_store import UserStore
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+ON_VERCEL = bool(os.getenv('VERCEL'))
 CATALOG_DB = os.getenv('CATALOG_DB', str(BASE_DIR / 'db' / 'catalog.sqlite3'))
-SESSION_DB = os.getenv('SESSION_DB', str(BASE_DIR / 'db' / 'session.sqlite3'))
-EVENT_DB = os.getenv('EVENT_DB', str(BASE_DIR / 'db' / 'events.sqlite3'))
-USER_DB = os.getenv('USER_DB', str(BASE_DIR / 'db' / 'users.sqlite3'))
+SESSION_DB = os.getenv('SESSION_DB', '/tmp/ying_session.sqlite3' if ON_VERCEL else str(BASE_DIR / 'db' / 'session.sqlite3'))
+EVENT_DB = os.getenv('EVENT_DB', '/tmp/ying_events.sqlite3' if ON_VERCEL else str(BASE_DIR / 'db' / 'events.sqlite3'))
+USER_DB = os.getenv('USER_DB', '/tmp/ying_users.sqlite3' if ON_VERCEL else str(BASE_DIR / 'db' / 'users.sqlite3'))
 WEB_DIR = BASE_DIR / 'site'
 
 if os.getenv('SESSION_BACKEND','sqlite').lower() == 'redis' and os.getenv('REDIS_URL'):
@@ -137,7 +138,7 @@ def save_scene(body: SceneSaveIn, authorization: str | None = Header(default=Non
 def health():
     if agent.brain.required and not agent.brain.enabled:
         raise HTTPException(503,'openai_agent_not_configured')
-    return {'ok': True, 'version': '1.3.0', 'catalog_count': catalog.count(), 'catalog_db': str(Path(CATALOG_DB).resolve()), 'catalog_quality': catalog.quality_stats(), 'agent_mode': agent.brain.mode, 'openai_agent_enabled': agent.brain.enabled, 'social_connectors': social.configured()}
+    return {'ok': True, 'version': '1.4.0', 'catalog_count': catalog.count(), 'catalog_db': str(Path(CATALOG_DB).resolve()), 'catalog_quality': catalog.quality_stats(), 'agent_mode': agent.brain.mode, 'openai_agent_enabled': agent.brain.enabled, 'social_connectors': social.configured()}
 
 
 @app.get('/v1/demo/meta')
