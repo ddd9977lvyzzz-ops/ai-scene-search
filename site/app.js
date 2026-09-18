@@ -14,8 +14,9 @@ function removeMood(conflicts){state.profile.moods=state.profile.moods.filter(x=
 function parse(text){
   const p=state.profile; const q=text.trim(); state.lastQuery=q;
   if(/换一批|再来一批|换几个/.test(q)) return;
+  if(/都可以|电影剧集都可以|不限/.test(q)) p.contentTypes=[];
   if(/给我点惊喜|惊喜一点|探索/.test(q)) p.explore=true;
-  if(/电影/.test(q)) p.contentTypes=['movie']; else if(/电视剧|剧集|追一部.*剧|想看.*剧/.test(q)) p.contentTypes=['series'];
+  if(/电影|(?:恋爱|爱情|纯爱).{0,2}片/.test(q)) p.contentTypes=['movie']; else if(/电视剧|剧集|追一部.*剧|想看.*剧|恋爱剧|爱情剧|甜宠剧|小甜剧/.test(q)) p.contentTypes=['series'];
   if(/国产|中国大陆|中文/.test(q)) p.language='Chinese';
   if(/恋爱|爱情|纯爱|甜宠/.test(q)){p.requiredGenres=mergeUnique(p.requiredGenres,['Romance']);p.relationship=mergeUnique(p.relationship,['romantic']);}
   if(/喜剧|好笑|搞笑|逗/.test(q)){p.requiredSignals=mergeUnique(p.requiredSignals,['funny']);}
@@ -42,6 +43,26 @@ function parse(text){
   const m=q.match(/(?:两小时|2小时)/); if(m) p.runtimeMax=120;
   const mins=q.match(/(\d{2,3})\s*分钟/); if(mins) p.runtimeMax=Number(mins[1]);
   const ref=q.match(/《([^》]{1,30})》/); if(ref) p.sourceReference=ref[1].trim();
+}
+function nextClarification(){
+  const p=state.profile;
+  if(!p.companions){
+    return {question:'这次是自己看，还是和别人一起看？',options:['一个人看','和朋友看','跟家人看','和对象看']};
+  }
+  if(!p.moods.length&&!p.requiredSignals.length&&!p.scene){
+    return {question:'你更想获得哪种感觉：轻松、刺激、治愈，还是烧脑？',options:['轻松一点','刺激一点','治愈一点','想烧脑']};
+  }
+  if(!p.contentTypes.length&&!p.sourceReference){
+    return {question:'内容形态上更想看电影还是剧集？',options:['只看电影','只看剧','都可以']};
+  }
+  return null;
+}
+function renderClarify(item){
+  startConversation();
+  $('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">此</div><div><p class="agent-intro">${esc(item.question)}</p><div class="clarify-options">${item.options.map(x=>`<button type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('')}</div></div></div>`);
+  profileChips();
+  $('#quick-actions').classList.add('hidden');
+  scrollEnd();
 }
 function hardOk(x){const p=state.profile;
   if(p.contentTypes.length&&!p.contentTypes.includes(x.ct))return false;
@@ -94,7 +115,7 @@ function addUser(t){startConversation();$('#messages').insertAdjacentHTML('befor
 function card(x,i){const rt=x.rt||x.ert;const meta=[x.y,rt?`${rt} 分钟`:null,labels[x.ct]||x.ct,x.pb==='low'?'偏冷门':x.pb==='high'?'较热门':null].filter(Boolean).join(' · ');const tags=[...arr(x.g).slice(0,2),...arr(x.to).slice(0,2)].map(v=>`<span>${esc(labels[v]||v)}</span>`).join('');const rn=arr(x.rn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);const sn=arr(x.sn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);return `<article class="rec-card"><img class="rec-poster" src="${esc(x.p)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.style.visibility='hidden'"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(reason(x))}</p>${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button></div></article>`}
 function render(items){const intro=items.length?'我先锁住你明确说出的类型、时长、平台/风险边界，再用场景和内容特征排序。探索只发生在满足硬条件的候选里。':'这组硬条件下暂时没有足够可靠的结果，可以放宽一个条件再试。';$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">此</div><div><p class="agent-intro">${intro}</p>${items.length?`<div class="recommend-list">${items.map(card).join('')}</div>`:'<div class="no-match"><p>没有找到满足全部硬条件的候选。</p></div>'}</div></div>`);profileChips();const qa=['换一批','更轻松一点','更小众一点','给我点惊喜'];$('#quick-actions').innerHTML=qa.map(x=>`<button type="button" data-prompt="${x}">${x}</button>`).join('');$('#quick-actions').classList.remove('hidden');scrollEnd()}
 function scrollEnd(){requestAnimationFrame(()=>window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}))}
-async function sendMessage(text){text=(text||'').trim();if(!text||state.busy)return;state.busy=true;$('#send').disabled=true;addUser(text);$('#message-input').value='';parse(text);render(recommend());state.busy=false;$('#send').disabled=false;}
+async function sendMessage(text){text=(text||'').trim();if(!text||state.busy)return;state.busy=true;$('#send').disabled=true;addUser(text);$('#message-input').value='';parse(text);const clarify=nextClarification();if(clarify){renderClarify(clarify);}else{render(recommend());}state.busy=false;$('#send').disabled=false;}
 function openDetail(id){const x=state.catalog.find(v=>v.id===id);if(!x)return;const risks=arr(x.rn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);const surprises=arr(x.sn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);$('#detail-body').innerHTML=`<div class="detail"><img src="${esc(x.p)}" alt="${esc(x.t)} 海报"><div><small>${esc([x.y,labels[x.ct],(x.rt||x.ert)?(x.rt||x.ert)+' 分钟':null].filter(Boolean).join(' · '))}</small><h2>${esc(x.t)}</h2><p>${esc(x.d||'暂无简介')}</p><p><strong>类型：</strong>${arr(x.g).map(esc).join(' / ')||'未标注'}</p><p><strong>氛围：</strong>${arr(x.to).map(v=>esc(labels[v]||v)).join(' / ')||'暂无'}</p>${risks.length?`<p><strong>可能雷点：</strong>${esc(risks.slice(0,5).join(' / '))}</p>`:'<p><strong>可能雷点：</strong>证据不足，不等于确定没有雷点。</p>'}${surprises.length?`<p><strong>无剧透看点：</strong>${esc(surprises.slice(0,5).join(' / '))}</p>`:''}<small>内容理解置信度：${Math.round((x.uc||0)*100)}% · 来源：${esc(x.src||'catalog')}</small></div></div>`;$('#detail-dialog').showModal()}
 function reset(){state.profile=freshProfile();state.seen.clear();state.lastQuery='';$('#messages').innerHTML='';$('#conversation').classList.add('hidden');$('#welcome').classList.remove('hidden');$('#active-profile').classList.add('hidden');$('#quick-actions').classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'})}
 const FALLBACK_ITEMS=[
