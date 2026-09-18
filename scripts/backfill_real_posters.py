@@ -107,7 +107,7 @@ def main():
     con.row_factory=sqlite3.Row
     con.executescript(DDL)
     rows=con.execute("""
-      SELECT content_id,title,content_type,release_year,poster_url,source,source_id
+      SELECT content_id,title,content_type,release_year,poster_url,source,source_id,source_url
       FROM content ORDER BY content_id
     """).fetchall()
 
@@ -129,7 +129,7 @@ def main():
                 kept+=1
                 con.execute(
                     "INSERT OR REPLACE INTO poster_assets VALUES (?,?,?,?,?,?,?)",
-                    (row["content_id"],existing,source or "source","",row["source_id"] or "",.94,now)
+                    (row["content_id"],existing,source or "source",row["source_id"] or "",row["source_url"] or "",.94,now)
                 )
                 continue
 
