@@ -118,26 +118,32 @@ def main():
     with httpx.Client(timeout=15,follow_redirects=True,headers={"User-Agent":"YING/1.3 poster-backfill"}) as client:
         for row in rows:
             existing=row["poster_url"] or ""
-            if valid_real_url(existing):
+            source=(row["source"] or "").lower()
+            # TVMaze primary show images are documented as poster-format images. Curated records
+            # are manually sourced poster assets. Generic Wikidata P18 is NOT automatically treated
+            # as a poster because it can be a still, logo, or other image.
+            trusted_existing = valid_real_url(existing) and (
+                source=="tvmaze" or source.endswith("_curated") or source.startswith("manual_")
+            )
+            if trusted_existing:
                 kept+=1
                 con.execute(
                     "INSERT OR REPLACE INTO poster_assets VALUES (?,?,?,?,?,?,?)",
-                    (row["content_id"],existing,row["source"] or "source","",row["source_id"] or "",.92,now)
+                    (row["content_id"],existing,source or "source","",row["source_id"] or "",.94,now)
                 )
                 continue
 
             found=None
-            # Series/animation/variety: TVMaze can often provide a real primary poster without a key.
-            if row["content_type"] in {"series","animation","variety"}:
+            # TMDB is the preferred backfill because poster_path is explicitly poster artwork.
+            try:
+                found=tmdb_poster(client,token,row["title"],row["content_type"],row["release_year"])
+            except Exception:
+                found=None
+
+            # If TMDB is unavailable or has no match, TVMaze is a keyless fallback for series.
+            if found is None and row["content_type"] in {"series","animation","variety"}:
                 try:
                     found=tvmaze_poster(client,row["title"])
-                except Exception:
-                    found=None
-
-            # TMDB is the authoritative backfill for both movie and TV artwork in this project.
-            if found is None:
-                try:
-                    found=tmdb_poster(client,token,row["title"],row["content_type"],row["release_year"])
                 except Exception:
                     found=None
 
@@ -164,6 +170,7 @@ def main():
         "real_poster_coverage":round((kept+repaired)/max(1,total),4),
         "unresolved":len(missing),
         "tmdb_configured":bool(token),
+        "poster_policy":"TVMaze/TMDB/curated poster assets only; generic Wikidata P18 is not sufficient",
         "missing_sample":missing[:25],
     },ensure_ascii=False,indent=2))
     con.close()
