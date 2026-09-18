@@ -52,6 +52,15 @@
 
 ## 3. 核心产品结构
 
+### 3.0 完整网站信息架构
+
+- **Agent**：核心对话决策页，负责自然语言理解、约束管理、推荐与解释。
+- **发现**：按“下班后 / 聚会 / 指定平台 / 小众探索 / 参考作品 / 直接替我选”等场景进入，而不是传统类型榜单。
+- **社区**：Scene Card 社区，用户复用“场景 + 边界 + 片单”。
+- **片单**：账户收藏、后续看过/不喜欢/踩雷反馈与私人 Scene。
+- **内容详情**：真实海报、平台快照、剧情事实、雷点、无剧透看点和证据层。
+- **账户**：完整 FastAPI 模式走服务端账户与片单；GitHub Pages 仅保留无密钥预览。
+
 ### 3.1 首页 / Agent
 
 输入自然语言 → 自动提取：
@@ -171,6 +180,17 @@ Decision / Explanation
 - `unknown`：没有可靠证据
 
 当用户明确说“只看爱奇艺”时，只接受 `verified_availability=iqiyi` 的候选。
+
+### 4.4 LLM Agent Brain
+
+完整网站不是“自然语言 → 数据库查找”的壳。服务端通过 **OpenAI Responses API** 接入模型，当前默认模型为 `gpt-5.6-terra`，承担两层职责：
+
+1. **Semantic Planning**：理解隐含场景、情绪负荷、语气、关系线、探索意图，并生成 query rewrite / retrieval hints。
+2. **Grounded Answer Generation**：只基于 Hard Gate 后的候选、Evidence RAG 与平台证据生成自然语言推荐，不允许模型凭空创造片名、剧情事实或可观看平台。
+
+确定性代码仍掌控平台、年份、时长、明确雷点和 Plot Facts 等 Hard Constraints。也就是说：**LLM 负责理解与表达，检索/RAG负责事实，Hard Gate负责不可违反的边界。**
+
+生产模式若没有模型 API，会直接暴露“Agent 未连接”，不会把本地检索伪装成 AI 回答。
 
 ---
 
@@ -318,7 +338,9 @@ Social Score 在总排序中的权重控制在低位（当前设计约 5%），�
 - OpenAI Responses API Agent Brain：语义规划 + grounded answer generation；Hard Constraints 仍由确定性代码掌控
 - 多路召回 / Scene Vector / RRF
 - Social Evidence 后端接口与真实性评分框架
-- 本地账户、收藏片单、Scene Community Demo
+- 完整网站 SPA：Agent / 发现 / 社区 / 片单
+- 标签可点击逐项删除，并同步服务端 Session Profile
+- FastAPI 服务端账户、收藏片单与 Scene Community；Pages 仅作本地预览
 - Decision Mode
 
 ### 下一版本 P0
@@ -326,7 +348,7 @@ Social Score 在总排序中的权重控制在低位（当前设计约 5%），�
 1. 将 3,339 条内容扩充为高覆盖 Plot Facts + Evidence。
 2. 增加真实平台可用性定时刷新。
 3. 配置百度 AI Search / X API 后上线 Social Evidence 实时检索。
-4. 将 Pages 本地账户切换到 FastAPI 服务端账户。
+4. 将服务端账户、Session、Event 从 Demo SQLite 升级为持久化生产存储。
 5. 加入“看过 / 不喜欢 / 踩雷”反馈闭环。
 
 ### P1
