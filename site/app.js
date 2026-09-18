@@ -466,13 +466,20 @@ async function sendMessage(text){
     if(clarify)renderClarify(clarify);else render(recommend());
   }finally{state.busy=false;$('#send').disabled=false}
 }
-function openDetail(id){
-  const x=state.catalog.find(v=>v.id===id);if(!x)return;
+async function openDetail(id){
+  let x=state.catalog.find(v=>v.id===id);
+  if(state.backendReady){
+    try{
+      const r=await fetch(apiUrl('/v1/content/'+encodeURIComponent(id)));
+      if(r.ok)x=mergeCatalogItem(backendCatalogItem(await r.json()));
+    }catch(e){console.warn('detail hydrate failed',e)}
+  }
+  if(!x)return;
   const risks=arr(x.rn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
   const surprises=arr(x.sn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
   const facts=[...factSet(x)].map(v=>labels[v]||v);
   const platforms=arr(x.pl).map(v=>labels[v]||v);
-  $('#detail-body').innerHTML=`<div class="detail"><img src="${esc(posterFor(x))}" onerror="this.classList.add('poster-broken');this.alt='海报加载失败'" alt="${esc(x.t)} 海报"><div><small>${esc([x.y,labels[x.ct],(x.rt||x.ert)?(x.rt||x.ert)+' 分钟':null].filter(Boolean).join(' · '))}</small><h2>${esc(x.t)}</h2><p>${esc(x.d||'暂无简介')}</p><p><strong>平台快照：</strong>${platforms.length?esc(platforms.join(' / ')):'未验证；指定平台时不会把未知当作可用'}</p><p><strong>类型：</strong>${arr(x.g).map(esc).join(' / ')||'未标注'}</p><p><strong>氛围：</strong>${arr(x.to).map(v=>esc(labels[v]||v)).join(' / ')||'暂无'}</p>${facts.length?`<p><strong>结构化剧情事实：</strong>${esc(facts.join(' / '))}</p>`:'<p><strong>结构化剧情事实：</strong>当前证据不足，不把“未知”当成“没有”。</p>'}${risks.length?`<p><strong>可能雷点：</strong>${esc(risks.slice(0,5).join(' / '))}</p>`:'<p><strong>可能雷点：</strong>证据不足，不等于确定没有雷点。</p>'}${surprises.length?`<p><strong>无剧透看点：</strong>${esc(surprises.slice(0,5).join(' / '))}</p>`:''}<button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏到我的片单'}</button><p><small>内容理解置信度：${Math.round((x.uc||0)*100)}% · 数据层：${esc(x.src||'curated / public metadata')}</small></p></div></div>`;
+  $('#detail-body').innerHTML=`<div class="detail"><img src="${esc(posterFor(x))}" onerror="this.classList.add('poster-broken');this.alt='海报加载失败'" alt="${esc(x.t)} 海报"><div><small>${esc([x.y,labels[x.ct],(x.rt||x.ert)?(x.rt||x.ert)+' 分钟':null].filter(Boolean).join(' · '))}</small><h2>${esc(x.t)}</h2><p>${esc(x.d||'暂无简介')}</p><p><strong>平台快照：</strong>${platforms.length?esc(platforms.join(' / ')):'未验证；指定平台时不会把未知当作可用'}</p><p><strong>类型：</strong>${arr(x.g).map(esc).join(' / ')||'未标注'}</p><p><strong>氛围：</strong>${arr(x.to).map(v=>esc(labels[v]||v)).join(' / ')||'暂无'}</p>${facts.length?`<p><strong>结构化剧情事实：</strong>${esc(facts.join(' / '))}</p>`:'<p><strong>结构化剧情事实：</strong>当前证据不足，不把“未知”当成“没有”。</p>'}${risks.length?`<p><strong>可能雷点：</strong>${esc(risks.slice(0,5).join(' / '))}</p>`:'<p><strong>可能雷点：</strong>证据不足，不等于确定没有雷点。</p>'}${surprises.length?`<p><strong>无剧透看点：</strong>${esc(surprises.slice(0,5).join(' / '))}</p>`:''}<button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏到我的片单'}</button><p><small>内容理解置信度：${Math.round((x.uc||0)*100)}% · 数据层：${esc(x.src||'canonical catalog')}</small></p></div></div>`;
   $('#detail-dialog').showModal();
 }
 function reset(){state.profile=freshProfile();state.seen.clear();state.lastQuery='';state.backendSession=null;$('#messages').innerHTML='';$('#conversation').classList.add('hidden');$('#welcome').classList.remove('hidden');$('#active-profile').classList.add('hidden');$('#quick-actions').classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'})}
