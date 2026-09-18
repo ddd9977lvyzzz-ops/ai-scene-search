@@ -41,6 +41,12 @@ def hard_filter(cands:list[Candidate], p:SceneProfile):
             if _genre_match(c, avoid): reasons.append(f'avoid_genre:{avoid}')
         if p.avoid_risks and any(r in c.risk_tags for r in p.avoid_risks):
             reasons.extend([f'avoid_risk:{r}' for r in p.avoid_risks if r in c.risk_tags])
+        for fact in p.required_facts:
+            if c.content_facts.get(fact) is not True:
+                reasons.append(f'required_fact_missing:{fact}')
+        for fact in p.avoid_facts:
+            if c.content_facts.get(fact) is True:
+                reasons.append(f'avoid_fact:{fact}')
         if p.platforms and not set(p.platforms)&set(c.platforms):
             reasons.append('platform_unavailable_in_snapshot')
         if reasons: dropped.append((c,reasons))
