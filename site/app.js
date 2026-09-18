@@ -3,7 +3,7 @@ const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const labels={solo:'自己看',family:'和家人',friends:'和朋友',couple:'和对象',weekend:'周末',party:'聚会',late_night:'睡前',meal:'饭后',light:'轻松',relaxing:'放松',healing:'治愈',funny:'好笑',exciting:'刺激',tense:'紧张',thought_provoking:'烧脑',romantic:'恋爱感',movie:'电影',series:'电视剧',variety:'综艺',animation:'动漫',documentary:'纪录片',low:'低负担',high:'高信息量',Romance:'恋爱/爱情',Comedy:'喜剧',Thriller:'悬疑',Mystery:'推理',Action:'动作',Horror:'恐怖',niche:'小众优先',mainstream:'热门优先',sweet:'偏甜',gentle:'温柔',realistic:'现实',bittersweet:'苦甜',dark:'偏暗黑',playful:'轻快',warm:'温暖',precise:'精准匹配',balanced:'适度探索',explore:'探索模式',no_character_death:'没有角色死亡',happy_ending:'明确偏圆满',no_animal_harm:'无动物伤害',no_infidelity:'无出轨主线',no_gore:'无血腥重点',no_jump_scares:'无跳吓重点',no_sexual_content:'无明显大尺度',family_safe:'家庭共看友好',closed_ending:'结局收束',romance_central:'恋爱主线',friendship_central:'友情主线',career_central:'事业成长'};
 const starters=['我想看小众恋爱片','我想看没有任何人死去的电影，最好结局也圆满','最近想自己追一部2026国产剧，节奏快一点','和朋友聚会，想看轻松好笑的电影','和爸妈一起看，不要尴尬也不要大尺度','像《功夫》一样好笑，但不要太暴力','悬疑一点，但不要恐怖，也别有跳吓','给我一部我平时不会主动搜到、但很适合今晚的片'];
 const state={catalog:[],profile:freshProfile(),seen:new Set(),busy:false,lastQuery:''};
-function freshProfile(){return {contentTypes:[],requiredGenres:[],avoidGenres:[],requiredSignals:[],avoidRisks:[],requiredFacts:[],avoidFacts:[],moods:[],relationship:[],tone:[],pace:[],companions:null,scene:null,cognitive:null,popularity:null,language:null,runtimeMax:null,yearMin:null,explore:false,sourceReference:null};}
+function freshProfile(){return {contentTypes:[],requiredGenres:[],avoidGenres:[],requiredSignals:[],avoidRisks:[],requiredFacts:[],avoidFacts:[],moods:[],relationship:[],tone:[],pace:[],companions:null,scene:null,cognitive:null,popularity:null,language:null,runtimeMax:null,yearMin:null,explore:false,pickOne:false,sourceReference:null};}
 function toast(m){const n=$('#toast');n.textContent=m;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2200)}
 function arr(v){return Array.isArray(v)?v:[]}
 function lower(v){return String(v||'').toLowerCase()}
@@ -43,6 +43,7 @@ function parse(text){
   if(/换一批|再来一批|换几个/.test(q)) return;
   if(/都可以|电影剧集都可以|不限/.test(q)) p.contentTypes=[];
   if(/给我点惊喜|惊喜一点|探索|不会主动搜|意外一点/.test(q)) p.explore=true;
+  if(/只给我一个|直接选一个|替我选一个|帮我拍板|别给列表/.test(q)) p.pickOne=true;
   if(/电影/.test(q)) p.contentTypes=['movie']; else if(/电视剧|剧集|追一部.*剧|想看.*剧|恋爱剧|爱情剧|甜宠剧|小甜剧/.test(q)) p.contentTypes=['series'];
   if(/国产|中国大陆|中文/.test(q)) p.language='Chinese';
   const y=q.match(/(20\d{2})/); if(y)p.yearMin=Number(y[1]);
@@ -146,7 +147,7 @@ function score(x){const p=state.profile;let s=0;
 }
 function hash(s){let h=0;for(let i=0;i<String(s).length;i++)h=((h<<5)-h)+String(s).charCodeAt(i)|0;return Math.abs(h)}
 function recommend(){let pool=state.catalog.filter(x=>hardOk(x)&&!state.seen.has(x.id)); if(state.profile.sourceReference)pool=pool.filter(x=>x.t!==state.profile.sourceReference&&x.ot!==state.profile.sourceReference);
-  pool.sort((a,b)=>score(b)-score(a)); const top=pool.slice(0,5); top.forEach(x=>state.seen.add(x.id)); return top;}
+  pool.sort((a,b)=>score(b)-score(a)); const top=pool.slice(0,state.profile.pickOne?1:5); top.forEach(x=>state.seen.add(x.id)); return top;}
 function nearMisses(){
   return state.catalog
     .filter(x=>!state.seen.has(x.id))
@@ -166,7 +167,7 @@ function reason(x){const p=state.profile;const bits=[];
   if(vectorScore(x)>.25)bits.push('场景特征向量相似度较高');
   if(p.sourceReference&&anchorScore(x)>.15)bits.push(`与《${p.sourceReference}》在类型/氛围上有相似点`);
   return bits.slice(0,3).join('；')||'在当前合法候选里，综合类型、场景和内容理解得分靠前。';}
-function profileChips(){const p=state.profile;const raw=[p.companions,p.scene,...p.moods,p.cognitive,...p.contentTypes,...p.requiredGenres,...p.relationship,...p.pace].filter(Boolean);let vals=raw.map(x=>labels[x]||x);if(p.language)vals.push('中文/国产');if(p.sourceReference)vals.push(`类似《${p.sourceReference}》`);if(p.popularity)vals.push(labels[p.popularity]);if(p.runtimeMax)vals.push(`≤ ${p.runtimeMax} 分钟`);if(p.yearMin)vals.push(`${p.yearMin}+`);p.requiredFacts.forEach(x=>vals.push(labels[x]||x));if(p.explore)vals.push('探索模式');p.avoidGenres.forEach(x=>vals.push(`不要 ${labels[x]||x}`));p.avoidRisks.forEach(x=>vals.push(x==='emotionally_heavy'?'不要太虐':x==='fear_or_horror'?'不要惊吓':`避开 ${x}`));const n=$('#active-profile');n.innerHTML=[...new Set(vals)].map(x=>`<span>${esc(x)}</span>`).join('');n.classList.toggle('hidden',!vals.length)}
+function profileChips(){const p=state.profile;const raw=[p.companions,p.scene,...p.moods,p.cognitive,...p.contentTypes,...p.requiredGenres,...p.relationship,...p.pace].filter(Boolean);let vals=raw.map(x=>labels[x]||x);if(p.language)vals.push('中文/国产');if(p.sourceReference)vals.push(`类似《${p.sourceReference}》`);if(p.popularity)vals.push(labels[p.popularity]);if(p.runtimeMax)vals.push(`≤ ${p.runtimeMax} 分钟`);if(p.yearMin)vals.push(`${p.yearMin}+`);if(p.pickOne)vals.push('帮我拍板');p.requiredFacts.forEach(x=>vals.push(labels[x]||x));if(p.explore)vals.push('探索模式');p.avoidGenres.forEach(x=>vals.push(`不要 ${labels[x]||x}`));p.avoidRisks.forEach(x=>vals.push(x==='emotionally_heavy'?'不要太虐':x==='fear_or_horror'?'不要惊吓':`避开 ${x}`));const n=$('#active-profile');n.innerHTML=[...new Set(vals)].map(x=>`<span>${esc(x)}</span>`).join('');n.classList.toggle('hidden',!vals.length)}
 function startConversation(){$('#welcome').classList.add('hidden');$('#conversation').classList.remove('hidden')}
 function addUser(t){startConversation();$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-user"><p>${esc(t)}</p></div>`)}
 function card(x,i){
@@ -190,7 +191,7 @@ function render(items){
   }
   $('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">此</div><div><p class="agent-intro">${intro}</p>${body}</div></div>`);
   profileChips();
-  const qa=['换一批','不要有人死','结局要圆满','不要跳吓','更小众一点','给我点惊喜'];
+  const qa=['换一批','只替我选一个','不要有人死','结局要圆满','不要跳吓','更小众一点','给我点惊喜'];
   $('#quick-actions').innerHTML=qa.map(x=>`<button type="button" data-prompt="${x}">${x}</button>`).join('');
   $('#quick-actions').classList.remove('hidden');scrollEnd();
 }
