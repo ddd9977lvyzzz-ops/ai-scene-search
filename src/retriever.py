@@ -11,6 +11,7 @@ import numpy as np
 from .content_intelligence import ContentIntelligenceIndex
 from .models import Candidate, SceneProfile
 from .ranking import feature_vector_score, reciprocal_rank_fusion
+from .social_signal_service import SocialSignalService
 
 
 def _j(value):
@@ -56,6 +57,7 @@ class CatalogRetriever:
         self.con = sqlite3.connect(db_path, check_same_thread=False)
         self.con.row_factory = sqlite3.Row
         self.intelligence = ContentIntelligenceIndex(self.con)
+        self.social = SocialSignalService(self.con)
         self.verified_platforms = {}
         try:
             for row in self.con.execute("SELECT content_id,platform FROM platform_availability WHERE status='available' AND confidence>=0.75"):
@@ -76,6 +78,7 @@ class CatalogRetriever:
 
     def _from_row(self, row):
         intel = self.intelligence.get(row["content_id"])
+        social = self.social.aggregate(row["content_id"])
         return Candidate(
             content_id=row["content_id"], title=row["title"], content_type=row["content_type"],
             release_year=_int(row["release_year"]),
@@ -91,6 +94,8 @@ class CatalogRetriever:
             surprise_notes=intel.get('surprise_notes', []), popularity_value=_float(row["popularity"]),
             popularity_bucket=intel.get('popularity_bucket'), rating_score=_float(row["rating_score"]),
             understanding_confidence=float(intel.get('understanding_confidence', 0.0)),
+            social_score=float(social.get('score',0.0)), social_confidence=float(social.get('confidence',0.0)),
+            social_platforms=list(social.get('platforms',[])),
         )
 
     @staticmethod
