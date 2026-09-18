@@ -16,6 +16,12 @@ class CatalogService:
     def __init__(self, db_path: str):
         self.con = sqlite3.connect(db_path, check_same_thread=False)
         self.con.row_factory = sqlite3.Row
+        self.verified_platforms = {}
+        try:
+            for row in self.con.execute("SELECT content_id,platform FROM platform_availability WHERE status='available' AND confidence>=0.75"):
+                self.verified_platforms.setdefault(row['content_id'], []).append(row['platform'])
+        except sqlite3.OperationalError:
+            pass
 
     def count(self) -> int:
         return int(self.con.execute('SELECT COUNT(*) FROM content').fetchone()[0])
@@ -44,7 +50,7 @@ class CatalogService:
             'runtime_minutes': runtime, 'episode_runtime_minutes': _int(r['episode_runtime_minutes']),
             'countries': _j(r['countries_json']), 'language': r['language'], 'genres': _j(r['genres_json']),
             'poster_url': r['poster_url'] or None, 'backdrop_url': r['backdrop_url'] or None,
-            'origin_platforms': _j(r['origin_platforms_json']), 'platforms': _j(r['origin_platforms_json']),
+            'origin_platforms': _j(r['origin_platforms_json']), 'platforms': self.verified_platforms.get(r['content_id'], []),
             'cast': _j(r['cast_json']), 'directors': _j(r['directors_json']), 'creators': _j(r['creators_json']),
             'source': r['source'], 'source_id': r['source_id'], 'source_url': r['source_url'],
             'scene_tags': _j(r['scene_tags_json']), 'emotion_tags': _j(r['emotion_tags_json']),
