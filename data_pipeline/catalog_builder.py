@@ -519,7 +519,7 @@ def main():
     records=tvmaze_records(fetcher,args.tvmaze_target)
     china=china_series_records(fetcher,args.china_series_target)
     records.extend(china)
-    from data_pipeline.curated_2026 import curated_2026_records
+    from curated_2026 import curated_2026_records
     records.extend(curated_2026_records(Record))
     for _,qid in COUNTRIES.items():
         records.extend(wikidata_records(fetcher,kind="movie",country_qid=qid,limit=args.movies_per_country))
