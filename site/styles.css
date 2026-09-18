@@ -68,3 +68,8 @@
 @media(max-width:900px){.main-nav{position:fixed;left:50%;bottom:12px;z-index:60;transform:translateX(-50%);box-shadow:0 12px 35px rgba(20,20,20,.12);background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}.agent-shell{padding-bottom:90px}.composer-dock{bottom:62px}}
 @media(max-width:650px){.feature-grid,.page-community,.page-library{grid-template-columns:1fr}.page-head{padding-top:6px}}
 .poster-broken{opacity:.28;filter:grayscale(1)}.poster-broken::after{content:"海报加载失败"}
+.site-footer{width:min(940px,calc(100% - 32px));margin:50px auto 78px;padding:24px 0 0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:12px 28px;color:#8b8881;font-size:10px}
+.site-footer>div:first-child{display:flex;align-items:baseline;gap:9px}.site-footer strong{color:#292825;font-size:12px}.site-footer span{color:#9b9891}
+.footer-links{display:flex;gap:13px;flex-wrap:wrap;justify-content:flex-end}.footer-links a{color:#6f6b64;text-decoration:none}.footer-links a:hover{color:#1d1d1d}
+.site-footer p{grid-column:1/-1;margin:0;line-height:1.7;color:#aaa69e}
+@media(max-width:650px){.site-footer{grid-template-columns:1fr;margin-bottom:105px}.footer-links{justify-content:flex-start}.site-footer p{grid-column:auto}}
