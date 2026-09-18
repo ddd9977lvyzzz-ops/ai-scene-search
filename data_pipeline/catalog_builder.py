@@ -69,6 +69,32 @@ def year_of(value: str | None) -> int | None:
 def norm_title(value: str) -> str:
     return re.sub(r"[\W_]+", "", (value or "").casefold())
 
+def generated_poster_url(title: str, year: int | None = None) -> str:
+    """Stable SVG data-URI fallback so every catalog row has a renderable poster.
+
+    Source posters are always preferred. This fallback is deliberately marked by its
+    data: URI and contains only title/year, so it is safe for a portfolio demo and
+    never masquerades as an official key art asset.
+    """
+    safe_title=html.escape((title or "此刻看什么")[:28])
+    safe_year=str(year or "")
+    hue=sum(ord(ch) for ch in safe_title)%360
+    hue2=(hue+67)%360
+    svg=f"""<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <stop stop-color="hsl({hue} 35% 18%)"/><stop offset="1" stop-color="hsl({hue2} 48% 44%)"/>
+    </linearGradient></defs>
+    <rect width="600" height="900" rx="28" fill="url(#g)"/>
+    <circle cx="500" cy="160" r="150" fill="white" opacity=".08"/>
+    <text x="48" y="630" fill="white" font-family="sans-serif" font-size="28" opacity=".72">SCENE · {safe_year}</text>
+    <foreignObject x="48" y="670" width="510" height="160">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font:700 56px/1.15 sans-serif;color:white;word-break:break-all">{safe_title}</div>
+    </foreignObject>
+    <text x="48" y="852" fill="white" font-family="sans-serif" font-size="18" opacity=".62">AI SCENE SEARCH · GENERATED POSTER</text>
+    </svg>"""
+    return "data:image/svg+xml;charset=UTF-8,"+urllib.parse.quote(svg, safe="")
+
+
 def uniq(items):
     return list(dict.fromkeys(x for x in items if x not in (None, "", [])))
 
@@ -450,7 +476,7 @@ def write_db(path: str, records: list[Record]) -> None:
         rows.append((
             r.content_id,r.title,r.original_title,json_text(r.aliases),r.content_type,r.release_year,
             r.runtime_minutes,r.episode_runtime_minutes,json_text(r.countries),r.language,json_text(r.genres),
-            r.overview,r.poster_url,r.backdrop_url,json_text(r.origin_platforms),json_text(r.cast),
+            r.overview,(r.poster_url or generated_poster_url(r.title,r.release_year)),r.backdrop_url,json_text(r.origin_platforms),json_text(r.cast),
             json_text(r.directors),json_text(r.creators),r.source,r.source_id,r.source_url,
             search_text(r,f),json_text(f["scene_tags"]),json_text(f["emotion_tags"]),json_text(f["watching_tags"]),
             json_text(f["audience_tags"]),json_text(f["pace_tags"]),json_text(f["risk_tags"]),
@@ -469,6 +495,7 @@ def write_db(path: str, records: list[Record]) -> None:
         pass
     meta={
         "schema_version":SCHEMA_VERSION,
+        "poster_policy":"source_or_generated_svg_fallback",
         "record_count":str(len(records)),
         "builder":"public_api_catalog_builder_v1",
         "sources":"tvmaze,wikidata",
