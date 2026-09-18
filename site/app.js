@@ -605,7 +605,7 @@ async function init(){
     state.catalog=data.items||[];
     renderCollection();
     $('#catalog-status').innerHTML=aiReady?`<i></i>AI Agent · ${state.catalog.length.toLocaleString()} 部预览内容`:`<i></i>Pages 预览 · ${state.catalog.length.toLocaleString()} 部真实海报内容`;
-    $('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');
+    const mid=Math.ceil(starters.length/2);const a=starters.slice(0,mid),b=starters.slice(mid);const lane=xs=>[...xs,...xs].map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');$('#prompt-lane-a').innerHTML=lane(a);$('#prompt-lane-b').innerHTML=lane(b);
     const initial=(location.hash||'#agent').slice(1);switchView(['agent','discover','community','library'].includes(initial)?initial:'agent');
   }catch(e){console.error(e);toast('片库加载失败，请刷新页面')}
 }
