@@ -63,6 +63,11 @@ class SceneSaveIn(BaseModel):
     visibility: str = 'private'
 
 
+class ProfileRemoveIn(BaseModel):
+    key: str = Field(min_length=1, max_length=80)
+    value: str | None = Field(default=None, max_length=200)
+
+
 class FeedbackIn(BaseModel):
     event_name: str
     content_id: str | None = None
@@ -130,7 +135,7 @@ def save_scene(body: SceneSaveIn, authorization: str | None = Header(default=Non
 
 @app.get('/health')
 def health():
-    return {'ok': True, 'version': '1.0.0', 'catalog_count': catalog.count(), 'catalog_db': str(Path(CATALOG_DB).resolve()), 'catalog_quality': catalog.quality_stats()}
+    return {'ok': True, 'version': '1.3.0', 'catalog_count': catalog.count(), 'catalog_db': str(Path(CATALOG_DB).resolve()), 'catalog_quality': catalog.quality_stats(), 'agent_mode': agent.brain.mode, 'openai_agent_enabled': agent.brain.enabled, 'social_connectors': social.configured()}
 
 
 @app.get('/v1/demo/meta')
@@ -181,6 +186,41 @@ def chat(session_id: str, body: ChatIn):
         return agent.chat(session_id, body.text)
     except KeyError:
         raise HTTPException(404, 'session_not_found')
+
+
+@app.patch('/v1/sessions/{session_id}/profile/remove')
+def remove_profile_filter(session_id: str, body: ProfileRemoveIn):
+    state=store.get(session_id)
+    if state is None:
+        raise HTTPException(404,'session_not_found')
+    profile,exposed,turn=state
+    list_fields={
+        'moods':'moods','contentTypes':'content_types','requiredGenres':'required_genres',
+        'relationship':'relationship_focus','pace':'pace_preferences','requiredFacts':'required_facts',
+        'avoidGenres':'avoid_genres','avoidRisks':'avoid_risks'
+    }
+    scalar_fields={
+        'companions':'companions','scene':'scene','cognitive':'cognitive_load','language':'language',
+        'sourceReference':'source_reference','popularity':'popularity_preference',
+        'runtimeMax':'runtime_max','yearMin':'year_min'
+    }
+    if body.key in list_fields:
+        attr=list_fields[body.key]
+        current=list(getattr(profile,attr) or [])
+        setattr(profile,attr,[x for x in current if str(x)!=str(body.value)])
+    elif body.key=='platform':
+        profile.platforms=[]
+    elif body.key=='explore':
+        profile.exploration_mode='precise';profile.exploration_strength=0.0
+    elif body.key=='pickOne':
+        pass
+    elif body.key in scalar_fields:
+        setattr(profile,scalar_fields[body.key],None)
+    else:
+        raise HTTPException(400,'unsupported_profile_filter')
+    store.save(session_id,profile,exposed,turn)
+    events.log('profile_filter_removed',session_id,payload={'key':body.key,'value':body.value})
+    return {'ok':True,'profile':profile.to_dict()}
 
 
 @app.post('/v1/sessions/{session_id}/feedback')
