@@ -149,12 +149,6 @@ function mergeUnique(a,b){return [...new Set([...a,...b])];}
 function removeMood(conflicts){state.profile.moods=state.profile.moods.filter(x=>!conflicts.includes(x));}
 function factSet(x){return new Set(arr(x.cf).concat(Object.entries(x.facts||{}).filter(([,v])=>v===true).map(([k])=>k)));}
 function hasFact(x,f){return factSet(x).has(f);}
-function generatedPoster(x){
-  const seed=hash((x.id||'')+(x.t||'')); const h1=seed%360, h2=(h1+42+(seed%70))%360;
-  const title=String(x.t||'影').slice(0,14), year=x.y||'';
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${h1} 35% 18%)"/><stop offset="1" stop-color="hsl(${h2} 48% 44%)"/></linearGradient></defs><rect width="600" height="900" rx="28" fill="url(#g)"/><circle cx="485" cy="155" r="130" fill="white" opacity=".08"/><circle cx="80" cy="760" r="180" fill="white" opacity=".06"/><text x="52" y="650" fill="white" font-family="system-ui, sans-serif" font-size="25" opacity=".72">SCENE • ${year}</text><foreignObject x="48" y="680" width="510" height="160"><div xmlns="http://www.w3.org/1999/xhtml" style="font:700 58px/1.15 system-ui;color:white;letter-spacing:-2px;word-break:break-all">${esc(title)}</div></foreignObject><text x="52" y="850" fill="white" font-family="system-ui, sans-serif" font-size="18" opacity=".62">YING · DEMO POSTER</text></svg>`;
-  return 'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg);
-}
 function isRealPoster(url){return /^https?:\/\//i.test(String(url||''))}
 function posterFor(x){return isRealPoster(x.p)?x.p:'';}
 const VECTOR_DIMS=['funny','light','relaxing','healing','romantic','exciting','tense','thought_provoking','scary','fast','slow','romantic_rel','friendship','family','sweet','gentle','realistic','bittersweet','dark','playful','warm','niche','no_character_death','happy_ending','family_safe','no_gore','no_jump_scares'];
