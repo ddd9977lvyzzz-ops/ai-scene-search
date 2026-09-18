@@ -387,24 +387,6 @@ async function removeProfileFilter(key,value){
     }catch(e){console.warn('profile remove sync failed',e)}
   }
 }
-function removeProfileToken(kind,value){
-  const p=state.profile;
-  const listMap={moods:'moods',contentTypes:'contentTypes',requiredGenres:'requiredGenres',relationship:'relationship',pace:'pace',requiredFacts:'requiredFacts',avoidGenres:'avoidGenres',avoidRisks:'avoidRisks',tone:'tone'};
-  if(listMap[kind])p[listMap[kind]]=p[listMap[kind]].filter(x=>x!==value);
-  else if(kind==='companions')p.companions=null;
-  else if(kind==='scene')p.scene=null;
-  else if(kind==='cognitive')p.cognitive=null;
-  else if(kind==='language')p.language=null;
-  else if(kind==='sourceReference')p.sourceReference=null;
-  else if(kind==='popularity')p.popularity=null;
-  else if(kind==='runtimeMax')p.runtimeMax=null;
-  else if(kind==='yearMin')p.yearMin=null;
-  else if(kind==='platform')p.platform=null;
-  else if(kind==='pickOne')p.pickOne=false;
-  else if(kind==='explore')p.explore=false;
-  profileChips();
-  toast('已移除条件');
-}
 function profileChips(){
   const p=state.profile,tokens=[];
   const push=(kind,value,label)=>{if(value!==null&&value!==undefined&&value!=='')tokens.push({kind,value,label})};
@@ -428,7 +410,7 @@ function profileChips(){
   p.avoidGenres.forEach(x=>push('avoidGenres',x,`不要 ${labels[x]||x}`));
   p.avoidRisks.forEach(x=>push('avoidRisks',x,`避开 ${labels[x]||x}`));
   const n=$('#active-profile');
-  n.innerHTML=tokens.map(t=>`<button class="profile-chip" type="button" data-profile-kind="${esc(t.kind)}" data-profile-value="${esc(t.value)}"><span>${esc(t.label)}</span><i aria-hidden="true">×</i></button>`).join('');
+  n.innerHTML=tokens.map(t=>`<button class="profile-chip" type="button" data-remove-filter="${esc(t.kind)}" data-filter-value="${esc(t.value)}"><span>${esc(t.label)}</span><i aria-hidden="true">×</i></button>`).join('');
   n.classList.toggle('hidden',!tokens.length);
 }
 function startConversation(){$('#welcome').classList.add('hidden');$('#conversation').classList.remove('hidden')}
@@ -630,6 +612,7 @@ async function init(){
 document.addEventListener('click',e=>{
   const nav=e.target.closest('[data-view]');if(nav){switchView(nav.dataset.view);return}
   const rm=e.target.closest('[data-remove-filter]');if(rm){removeProfileFilter(rm.dataset.removeFilter,rm.dataset.filterValue);return}
+  const legacyChip=e.target.closest('[data-profile-kind]');if(legacyChip){removeProfileFilter(legacyChip.dataset.profileKind,legacyChip.dataset.profileValue);return}
   const p=e.target.closest('[data-prompt]');
   if(p){
     const community=$('#community-dialog');if(community&&community.open)community.close();
