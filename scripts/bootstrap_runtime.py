@@ -40,7 +40,10 @@ def main():
         '--movies-per-country',os.getenv('MOVIES_PER_COUNTRY','70'),
         '--min-records',os.getenv('MIN_RECORDS','1000'),
         '--min-china-series',os.getenv('MIN_CHINA_SERIES','120'))
-    run(sys.executable,'scripts/backfill_real_posters.py','--db',str(DB),'--strict')
+    poster_cmd=[sys.executable,'scripts/backfill_real_posters.py','--db',str(DB),'--strict']
+    if os.getenv('DROP_UNRESOLVED_POSTERS','').lower() in {'1','true','yes'} or os.getenv('VERCEL'):
+        poster_cmd.append('--drop-unresolved')
+    run(*poster_cmd)
     run(sys.executable,'scripts/migrate_content_intelligence.py','--db',str(DB))
     run(sys.executable,'scripts/migrate_platform_availability.py','--db',str(DB))
     run(sys.executable,'scripts/migrate_evidence_corpus.py','--db',str(DB))
