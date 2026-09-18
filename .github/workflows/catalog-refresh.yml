@@ -74,13 +74,32 @@ jobs:
         run: |
           git config user.name "ying-catalog-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add -f db/catalog.sqlite3 db/embedding_model.joblib
-          if git diff --cached --quiet; then
-            echo "Catalog bundle unchanged."
-          else
+
+          cp db/catalog.sqlite3 /tmp/catalog.sqlite3
+          cp db/embedding_model.joblib /tmp/embedding_model.joblib
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p db
+            cp /tmp/catalog.sqlite3 db/catalog.sqlite3
+            cp /tmp/embedding_model.joblib db/embedding_model.joblib
+            git add -f db/catalog.sqlite3 db/embedding_model.joblib
+
+            if git diff --cached --quiet; then
+              echo "Catalog bundle unchanged."
+              exit 0
+            fi
+
             git commit -m "chore: refresh audited catalog runtime bundle [skip ci]"
-            git push origin HEAD:main
-          fi
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push raced with another main update; retrying ($attempt/3)..."
+          done
+
+          echo "Failed to publish catalog bundle after 3 attempts."
+          exit 1
 
       - name: Upload audited catalog artifact
         uses: actions/upload-artifact@v4
