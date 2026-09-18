@@ -45,15 +45,45 @@ function syncProfileFromBackend(p,plan){
   };
   profileChips();
 }
-function backendItem(r){
-  const x={
-    id:r.content_id,t:r.title,ct:r.content_type,y:r.release_year,rt:r.runtime_minutes,g:arr(r.genres),
-    p:r.poster_url||'',pl:arr(r.platforms),to:arr(r.tone_tags),sn:arr(r.surprises),rn:arr(r.watchouts),
-    pb:r.popularity_bucket||'unknown',uc:r.evidence_level||.75,backendWhy:r.why||'',src:'canonical FastAPI catalog'
+function backendCatalogItem(r){
+  return {
+    id:r.content_id,t:r.title,ot:r.original_title||r.title,ct:r.content_type,y:r.release_year,
+    rt:r.runtime_minutes,ert:r.episode_runtime_minutes,co:arr(r.countries),g:arr(r.genres),
+    d:r.description||'',p:r.poster_url||'',pl:arr(r.platforms),op:arr(r.origin_platforms),
+    sc:arr(r.scene_tags),em:arr(r.emotion_tags),cl:r.cognitive_load||null,pa:arr(r.pace_tags),
+    ri:arr(r.risk_tags),re:arr(r.relationship_tags),th:arr(r.theme_tags),to:arr(r.tone_tags),
+    sn:arr(r.surprise_notes).length?arr(r.surprise_notes):arr(r.surprise_tags),
+    rn:arr(r.risk_notes),pb:r.popularity_bucket||'unknown',uc:r.understanding_confidence||r.tag_confidence||.7,
+    facts:r.content_facts||{},src:r.source||'canonical FastAPI catalog',sourceUrl:r.source_url||''
   };
+}
+function mergeCatalogItem(x){
   const existing=state.catalog.findIndex(v=>v.id===x.id);
   if(existing>=0)state.catalog[existing]={...state.catalog[existing],...x};else state.catalog.unshift(x);
   return x;
+}
+function backendItem(r){
+  const x=backendCatalogItem({
+    content_id:r.content_id,title:r.title,content_type:r.content_type,release_year:r.release_year,
+    runtime_minutes:r.runtime_minutes,genres:r.genres,poster_url:r.poster_url,platforms:r.platforms,
+    tone_tags:r.tone_tags,surprise_notes:r.surprises,risk_notes:r.watchouts,
+    popularity_bucket:r.popularity_bucket,understanding_confidence:r.evidence_level,
+    source:'canonical FastAPI catalog'
+  });
+  x.backendWhy=r.why||'';
+  x.evidence=r.evidence||{};
+  return mergeCatalogItem(x);
+}
+async function loadBackendCatalog(limitPages=5){
+  if(!state.backendReady)return null;
+  const pages=Array.from({length:limitPages},(_,i)=>i*60);
+  const settled=await Promise.allSettled(pages.map(offset=>fetch(apiUrl('/v1/catalog/browse?limit=60&offset='+offset)).then(r=>{
+    if(!r.ok)throw new Error('catalog '+r.status);return r.json();
+  })));
+  const rows=settled.flatMap(x=>x.status==='fulfilled'?arr(x.value.results):[]);
+  const items=rows.map(backendCatalogItem).filter(x=>isRealPoster(x.p));
+  if(!items.length)throw new Error('backend catalog empty');
+  return {version:'backend-canonical',count:items.length,full_catalog_count:null,items};
 }
 async function backendChat(text){
   const sid=await ensureBackendSession();
@@ -82,7 +112,7 @@ function storeGet(key,fallback){try{const v=localStorage.getItem(STORAGE_PREFIX+
 function storeSet(key,value){try{localStorage.setItem(STORAGE_PREFIX+key,JSON.stringify(value))}catch(e){}}
 function accountKey(){return account.user&&account.user.email?'watchlist:'+account.user.email:'watchlist:guest'}
 function loadAccount(){account.user=storeGet('user',null);account.token=storeGet('auth_token',null);account.watchlist=storeGet(accountKey(),[]);syncAccountUI()}
-async function syncAccountFromBackend(){if(!state.backendReady||!account.token)return;try{const r=await fetch(apiUrl('/v1/me'),{headers:{Authorization:'Bearer '+account.token}});if(!r.ok)throw new Error('auth');const data=await r.json();account.user={name:data.user.display_name,email:data.user.email,user_id:data.user.user_id};account.watchlist=arr(data.watchlist);storeSet('user',account.user);storeSet(accountKey(),account.watchlist);syncAccountUI();renderCollection()}catch(e){account.token=null;storeSet('auth_token',null)}}
+async function syncAccountFromBackend(){if(!state.backendReady||!account.token)return;try{const r=await fetch(apiUrl('/v1/me'),{headers:{Authorization:'Bearer '+account.token}});if(!r.ok)throw new Error('auth');const data=await r.json();account.user={name:data.user.display_name,email:data.user.email,user_id:data.user.user_id};account.watchlist=arr(data.watchlist);const wr=await fetch(apiUrl('/v1/me/watchlist'),{headers:{Authorization:'Bearer '+account.token}});if(wr.ok){const wd=await wr.json();arr(wd.items).forEach(v=>mergeCatalogItem(backendCatalogItem(v)))}storeSet('user',account.user);storeSet(accountKey(),account.watchlist);syncAccountUI();renderCollection()}catch(e){account.token=null;storeSet('auth_token',null)}}
 function syncAccountUI(){const b=$('#account-button'),logout=$('#auth-logout');if(b)b.textContent=account.user&&account.user.name?account.user.name:'登录';if(logout)logout.classList.toggle('hidden',!account.user)}
 function isSaved(id){return account.watchlist.indexOf(id)>=0}
 async function toggleSave(id){
@@ -524,6 +554,7 @@ async function loadLiveCatalog(){
   return {version:'live-tvmaze-plus-curated',count:items.length,full_catalog_count:3339,items};
 }
 async function loadCatalog(){
+  if(state.backendReady){try{return await loadBackendCatalog();}catch(e){console.warn('Backend catalog unavailable; falling back to preview catalog.',e)}}
   try{return await loadLiveCatalog();}
   catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.filter(x=>isRealPoster(x.p)).map(x=>({...x,pl:arr(x.pl)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
 }
