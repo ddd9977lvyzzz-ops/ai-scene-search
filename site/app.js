@@ -456,14 +456,24 @@ async function sendMessage(text){
   try{
     if(state.backendReady){
       const data=await backendChat(text);renderBackendResponse(data);
+    }else if(CONFIG.requireBackend){
+      $('#messages').insertAdjacentHTML('beforeend','<div class="turn-agent"><div class="agent-avatar">影</div><div><p class="agent-intro">AI Agent 后端当前未连接，所以我不会把本地检索伪装成模型回答。请检查服务端 /health 与 OPENAI_API_KEY。</p></div></div>');
+      scrollEnd();
     }else{
       parse(text);const clarify=nextClarification();
       if(clarify)renderClarify(clarify);else render(recommend());
     }
   }catch(e){
-    console.error(e);toast('AI 后端暂不可用，已切到本地检索预览');
-    state.backendReady=false;parse(text);const clarify=nextClarification();
-    if(clarify)renderClarify(clarify);else render(recommend());
+    console.error(e);
+    state.backendReady=false;
+    if(CONFIG.requireBackend){
+      $('#messages').insertAdjacentHTML('beforeend','<div class="turn-agent"><div class="agent-avatar">影</div><div><p class="agent-intro">这次没有返回模型结果：AI 后端调用失败。为避免把检索结果冒充 Agent 回答，本次不自动降级。</p></div></div>');
+      toast('AI Agent 后端调用失败');scrollEnd();
+    }else{
+      toast('Pages 预览：AI 后端不可用，使用本地检索逻辑');
+      parse(text);const clarify=nextClarification();
+      if(clarify)renderClarify(clarify);else render(recommend());
+    }
   }finally{state.busy=false;$('#send').disabled=false}
 }
 async function openDetail(id){
