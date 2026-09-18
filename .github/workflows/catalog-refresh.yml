@@ -2,48 +2,91 @@ name: Refresh canonical catalog
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/catalog-refresh.yml"
+      - "data_pipeline/**"
+      - "scripts/backfill_real_posters.py"
+      - "scripts/migrate_content_intelligence.py"
+      - "scripts/migrate_platform_availability.py"
+      - "scripts/migrate_evidence_corpus.py"
+      - "scripts/build_embeddings.py"
+      - "scripts/verify_catalog.py"
   schedule:
     - cron: "20 18 * * 1"
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: canonical-catalog-refresh
+  cancel-in-progress: true
 
 jobs:
-  build-and-audit:
+  build-audit-and-publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
-      TMDB_API_TOKEN: ${{ secrets.TMDB_API_TOKEN }}
       MIN_RECORDS: "1000"
       MIN_CHINA_SERIES: "120"
+      TVMAZE_TARGET: "1700"
+      CHINA_SERIES_TARGET: "180"
+      MOVIES_PER_COUNTRY: "30"
+      POSTER_WORKERS: "12"
+      POSTER_HTTP_TIMEOUT: "10"
+      TMDB_API_TOKEN: ${{ secrets.TMDB_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install catalog dependencies
-        run: pip install httpx numpy scikit-learn joblib
-      - name: Require TMDB poster token
-        run: |
-          test -n "$TMDB_API_TOKEN" || (echo "Add repository secret TMDB_API_TOKEN before running strict poster refresh" && exit 1)
+          cache: "pip"
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
       - name: Build public catalog
         run: |
-          python data_pipeline/catalog_builder.py --db /tmp/catalog.sqlite3 --tvmaze-target 3000 --china-series-target 220 --movies-per-country 70 --min-records "$MIN_RECORDS" --min-china-series "$MIN_CHINA_SERIES"
-      - name: Backfill real posters
-        run: python scripts/backfill_real_posters.py --db /tmp/catalog.sqlite3 --strict
-      - name: Add content intelligence
+          mkdir -p db
+          rm -f db/catalog.sqlite3 db/embedding_model.joblib
+          python data_pipeline/catalog_builder.py             --db db/catalog.sqlite3             --tvmaze-target "$TVMAZE_TARGET"             --china-series-target "$CHINA_SERIES_TARGET"             --movies-per-country "$MOVIES_PER_COUNTRY"             --min-records "$MIN_RECORDS"             --min-china-series "$MIN_CHINA_SERIES"
+
+      - name: Resolve real posters
         run: |
-          python scripts/migrate_content_intelligence.py --db /tmp/catalog.sqlite3
-          python scripts/migrate_platform_availability.py --db /tmp/catalog.sqlite3
-          python scripts/migrate_evidence_corpus.py --db /tmp/catalog.sqlite3
+          python scripts/backfill_real_posters.py             --db db/catalog.sqlite3             --strict             --drop-unresolved
+
+      - name: Add content intelligence and platform evidence
+        run: |
+          python scripts/migrate_content_intelligence.py --db db/catalog.sqlite3
+          python scripts/migrate_platform_availability.py --db db/catalog.sqlite3
+          python scripts/migrate_evidence_corpus.py --db db/catalog.sqlite3
+
       - name: Build semantic index
-        run: python scripts/build_embeddings.py --db /tmp/catalog.sqlite3 --model /tmp/embedding_model.joblib --dim 128
+        run: python scripts/build_embeddings.py --db db/catalog.sqlite3 --model db/embedding_model.joblib --dim 128
+
       - name: Strict quality gate
-        run: python scripts/verify_catalog.py --db /tmp/catalog.sqlite3 --min-records "$MIN_RECORDS" --min-china-series "$MIN_CHINA_SERIES"
+        run: |
+          python scripts/verify_catalog.py             --db db/catalog.sqlite3             --min-records "$MIN_RECORDS"             --min-china-series "$MIN_CHINA_SERIES"
+
+      - name: Publish audited runtime bundle to repository
+        run: |
+          git config user.name "ying-catalog-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -f db/catalog.sqlite3 db/embedding_model.joblib
+          if git diff --cached --quiet; then
+            echo "Catalog bundle unchanged."
+          else
+            git commit -m "chore: refresh audited catalog runtime bundle [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: Upload audited catalog artifact
         uses: actions/upload-artifact@v4
         with:
           name: ying-catalog-audited
           path: |
-            /tmp/catalog.sqlite3
-            /tmp/embedding_model.joblib
-          retention-days: 7
+            db/catalog.sqlite3
+            db/embedding_model.joblib
+          retention-days: 14
