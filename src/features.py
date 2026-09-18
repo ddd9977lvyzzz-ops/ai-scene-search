@@ -38,6 +38,11 @@ FEATURE_GROUPS = {
         'emotionally_heavy', 'childish', 'death_or_grief', 'infidelity',
         'abusive_relationship', 'animal_harm',
     ],
+    'plot_facts': [
+        'no_character_death', 'happy_ending', 'no_animal_harm', 'no_infidelity',
+        'no_gore', 'no_jump_scares', 'no_sexual_content', 'family_safe',
+        'closed_ending', 'romance_central', 'friendship_central', 'career_central',
+    ],
     'discovery': [
         'popularity_bucket', 'mainstreamness', 'novelty', 'freshness', 'rating_score',
         'rating_count',
@@ -49,10 +54,10 @@ FEATURE_GROUPS = {
 }
 
 FEATURE_ROLES = {
-    'structured_filter': FEATURE_GROUPS['hard_metadata'] + FEATURE_GROUPS['risk'],
+    'structured_filter': FEATURE_GROUPS['hard_metadata'] + FEATURE_GROUPS['risk'] + FEATURE_GROUPS['plot_facts'],
     'sparse_retrieval': FEATURE_GROUPS['relationships_themes'] + FEATURE_GROUPS['tone_style'],
     'dense_retrieval': FEATURE_GROUPS['affect'] + FEATURE_GROUPS['narrative'] + FEATURE_GROUPS['relationships_themes'] + FEATURE_GROUPS['tone_style'],
-    'ranking': FEATURE_GROUPS['scene_context'] + FEATURE_GROUPS['affect'] + FEATURE_GROUPS['narrative'] + FEATURE_GROUPS['relationships_themes'] + FEATURE_GROUPS['tone_style'] + FEATURE_GROUPS['discovery'],
+    'ranking': FEATURE_GROUPS['scene_context'] + FEATURE_GROUPS['affect'] + FEATURE_GROUPS['narrative'] + FEATURE_GROUPS['relationships_themes'] + FEATURE_GROUPS['tone_style'] + FEATURE_GROUPS['plot_facts'] + FEATURE_GROUPS['discovery'],
     'grounding_only': FEATURE_GROUPS['evidence_quality'],
 }
 
