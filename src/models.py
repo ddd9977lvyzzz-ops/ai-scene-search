@@ -113,6 +113,9 @@ class Candidate:
     popularity_bucket: Optional[str] = None
     rating_score: Optional[float] = None
     understanding_confidence: float = 0.0
+    social_score: float = 0.0
+    social_confidence: float = 0.0
+    social_platforms: list[str] = field(default_factory=list)
 
     score: float = 0.0
     score_breakdown: dict[str, float] = field(default_factory=dict)
