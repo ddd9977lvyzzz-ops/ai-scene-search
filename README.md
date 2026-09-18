@@ -200,3 +200,31 @@ Poster resolution order:
 
 Generated SVG placeholders and generic Wikidata P18 stills are rejected by the production quality gate. Startup fails if any canonical catalog row remains unresolved.
 
+
+
+## Deploy on Vercel without a card
+
+The repository is now configured for Vercel Hobby + Python FastAPI.
+
+One-click import:
+
+https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fddd9977lvyzzz-ops%2Fai-scene-search.git&project-name=ying-agent&repository-name=ai-scene-search
+
+No OpenAI secret is required for the Vercel deployment path. In production, YING automatically uses Vercel AI Gateway through the short-lived `VERCEL_OIDC_TOKEN` injected by Vercel and defaults to `openai/gpt-5.6-luna`. Direct OpenAI remains supported outside Vercel with `OPENAI_API_KEY`.
+
+Vercel build steps are committed in `vercel.json`:
+
+```text
+install requirements.txt
+→ build catalog
+→ online real-poster backfill
+→ drop only still-unresolved artwork rows
+→ content intelligence
+→ platform availability
+→ evidence corpus
+→ 128d retrieval vectors
+→ strict catalog verification
+→ FastAPI function + site
+```
+
+The production catalog therefore displays only titles with reachable real HTTP(S) artwork. Generated SVG placeholders are not accepted by the production quality gate.
