@@ -105,7 +105,7 @@ class SceneSearchAgent:
             if self.event_store: self.event_store.log('no_match',session_id,payload={'turn':turn,'blocker':blocker})
             return {'type':'no_match','session_id':session_id,'turn':turn,'profile':profile.to_dict(),'blocker':blocker,
                     'suggestion':'我不会偷偷放宽硬条件。可以只放宽一个条件后重试，例如时长、年份、平台或明确类型。',
-                    'debug':{'retrieved':len(retrieved),'after_hard_filter':len(kept),'dropped':len(dropped)}}
+                    'agent_mode':self.brain.mode,'llm_plan':plan,'debug':{'retrieved':len(retrieved),'after_hard_filter':len(kept),'dropped':len(dropped)}}
 
         result=[]
         for c in ranked:
@@ -124,7 +124,21 @@ class SceneSearchAgent:
                 'turn':turn,'result_ids':[x['content_id'] for x in result],'retrieved':len(retrieved),
                 'after_hard_filter':len(kept),'dropped':len(dropped),'exploration_mode':profile.exploration_mode,
             })
+        composed=self.brain.compose(
+            user_text=text,
+            profile=profile,
+            results=result,
+            social_policy={
+                'social_is_weak_signal':True,
+                'hard_constraints_never_overridden':True,
+                'platform_availability_requires_verified_evidence':True,
+            },
+        )
         return {'type':'recommend','session_id':session_id,'turn':turn,'profile':profile.to_dict(),'results':result,
-                'intent_engine':'rules+llm_soft' if llm_intent_enabled() else 'rules+semantic_retrieval',
+                'assistant_message':(composed or {}).get('assistant_message'),
+                'decision_summary':(composed or {}).get('decision_summary'),
+                'follow_up_suggestions':(composed or {}).get('follow_up_suggestions') or _quick_actions(profile),
+                'agent_mode':self.brain.mode,'llm_plan':plan,
+                'intent_engine':'deterministic_hard_constraints+openai_responses' if self.brain.enabled else 'deterministic_fallback',
                 'quick_actions':_quick_actions(profile),
                 'debug':{'retrieved':len(retrieved),'after_hard_filter':len(kept),'dropped':len(dropped)}}
