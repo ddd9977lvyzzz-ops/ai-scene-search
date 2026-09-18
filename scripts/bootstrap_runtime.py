@@ -22,8 +22,10 @@ def healthy() -> bool:
         vectors=int(con.execute('select count(*) from content_vectors').fetchone()[0])
         intelligence=int(con.execute('select count(*) from content_intelligence').fetchone()[0])
         platform_rows=int(con.execute('select count(*) from platform_availability').fetchone()[0])
+        real_posters=int(con.execute("select count(*) from content where poster_url like 'https://%' or poster_url like 'http://%'").fetchone()[0])
+        generated=int(con.execute("select count(*) from content where poster_url like 'data:image/%'").fetchone()[0])
         con.close()
-        return records>=1000 and vectors==records and intelligence==records and platform_rows>=0
+        return records>=1000 and vectors==records and intelligence==records and platform_rows>=0 and real_posters==records and generated==0
     except Exception:
         return False
 
