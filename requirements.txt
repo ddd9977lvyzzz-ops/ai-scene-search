@@ -1,0 +1,11 @@
+fastapi==0.128.2
+uvicorn[standard]==0.48.0
+pydantic==2.13.4
+numpy>=2.0,<3
+scikit-learn==1.8.0
+joblib>=1.4,<2
+httpx>=0.27,<1
+
+# Optional at runtime; local demo works without an API key.
+openai>=2,<3
+redis>=5,<7
