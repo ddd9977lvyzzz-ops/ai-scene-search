@@ -60,7 +60,7 @@ ANSWER_SCHEMA = {
 class LLMAgentBrain:
     def __init__(self):
         self.api_key=os.getenv("OPENAI_API_KEY","").strip()
-        self.model=os.getenv("OPENAI_AGENT_MODEL","gpt-5.6-luna").strip()
+        self.model=os.getenv("OPENAI_AGENT_MODEL","gpt-5.6-terra").strip()
         self.base_url=os.getenv("OPENAI_BASE_URL","").strip() or None
         self.enabled_flag=os.getenv("OPENAI_AGENT_ENABLED","1").strip().lower() in {"1","true","yes"}
         self.required=os.getenv("OPENAI_AGENT_REQUIRED","0").strip().lower() in {"1","true","yes"}
