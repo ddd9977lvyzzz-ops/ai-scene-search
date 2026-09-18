@@ -1,0 +1,11 @@
+services:
+  web-demo:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      CATALOG_DB: /app/db/catalog.sqlite3
+      SESSION_DB: /app/db/session.sqlite3
+      EVENT_DB: /app/db/events.sqlite3
+    volumes:
+      - ./db:/app/db
