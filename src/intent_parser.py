@@ -112,7 +112,7 @@ def parse_intent(text: str) -> SceneProfile:
     # Colloquial romance phrases.
     if any(x in t for x in ['恋爱片','爱情片','纯爱片','小甜剧','甜宠剧','恋爱剧','爱情剧']):
         _add_unique(p.genres, 'Romance'); _add_unique(p.required_genres, 'Romance'); _add_unique(p.relationship_focus, 'romantic')
-        if any(x in t for x in ['恋爱电影','爱情电影','纯爱电影']): _add_unique(p.content_types, 'movie')
+        if any(x in t for x in ['恋爱电影','爱情电影','纯爱电影','恋爱片','爱情片','纯爱片']): _add_unique(p.content_types, 'movie')
         if any(x in t for x in ['恋爱剧','爱情剧','小甜剧','甜宠剧']): _add_unique(p.content_types, 'series')
     if any(x in t for x in ['恋爱','爱情','感情线','情侣关系','CP感','cp感']): _add_unique(p.relationship_focus, 'romantic')
     if any(x in t for x in ['成年人恋爱','成人恋爱','成熟恋爱','成年人的爱情']):
