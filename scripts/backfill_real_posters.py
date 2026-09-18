@@ -16,9 +16,11 @@ reachable image, otherwise the catalog build fails.
 import argparse
 import json
 import os
+import re
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from urllib.parse import urljoin
 
 import httpx
 
@@ -83,6 +85,80 @@ def pick_year_match(results, year):
         exact=0 if ry==year else 1 if ry and abs(ry-year)<=1 else 2
         return (exact, -(r.get("popularity") or 0))
     return sorted(results,key=score)[0]
+
+
+
+def official_page_poster(client: httpx.Client, source_url: str):
+    """Try the page's declared social/card image before falling back to third-party search."""
+    if not source_url or not source_url.startswith(("http://","https://")):
+        return None
+    try:
+        r=client.get(source_url)
+        if r.status_code!=200:
+            return None
+        html=r.text[:2_000_000]
+        patterns=[
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+            r'<meta[^>]+name=["\']twitter:image(?::src)?["\'][^>]+content=["\']([^"\']+)',
+            r'<link[^>]+rel=["\']image_src["\'][^>]+href=["\']([^"\']+)',
+        ]
+        candidates=[]
+        for pat in patterns:
+            candidates.extend(re.findall(pat,html,re.I))
+        for raw in candidates:
+            url=urljoin(source_url,raw.replace("&amp;","&"))
+            if reachable_image(client,url):
+                return {
+                    "url":url,
+                    "provider":"official_page_meta",
+                    "provider_id":"",
+                    "source_url":source_url,
+                    "confidence":.90,
+                }
+    except Exception:
+        return None
+    return None
+
+
+def commons_poster(client: httpx.Client, title: str):
+    """Keyless public-image search for poster-labelled Wikimedia Commons files.
+
+    We only accept file results whose filename/search title explicitly contains poster/海报/
+    theatrical/key art signals; generic P18 stills are intentionally excluded.
+    """
+    try:
+        params={
+            "action":"query","format":"json","generator":"search","gsrnamespace":"6",
+            "gsrsearch":f'"{title}" poster OR theatrical poster OR 海报',
+            "gsrlimit":"12","prop":"imageinfo","iiprop":"url|mime",
+        }
+        r=client.get("https://commons.wikimedia.org/w/api.php",params=params)
+        r.raise_for_status()
+        pages=(r.json().get("query") or {}).get("pages") or {}
+        ranked=[]
+        for page in pages.values():
+            name=(page.get("title") or "").casefold()
+            if not any(k in name for k in ["poster","海报","theatrical","key art"]):
+                continue
+            info=(page.get("imageinfo") or [{}])[0]
+            url=info.get("thumburl") or info.get("url") or ""
+            mime=(info.get("mime") or "").casefold()
+            if not mime.startswith("image/"):
+                continue
+            ranked.append((0 if "poster" in name or "海报" in name else 1,url,page.get("title") or ""))
+        for _,url,name in sorted(ranked):
+            if reachable_image(client,url):
+                return {
+                    "url":url,
+                    "provider":"wikimedia_commons_poster_search",
+                    "provider_id":name,
+                    "source_url":"https://commons.wikimedia.org/wiki/"+name.replace(" ","_"),
+                    "confidence":.78,
+                }
+    except Exception:
+        return None
+    return None
 
 
 def tvmaze_poster(client: httpx.Client, title: str):
@@ -157,16 +233,30 @@ def resolve_one(row: dict, token: str, timeout: float):
                 "confidence":.95,
             }
 
-        # Prefer TMDB for poster-specific artwork.
+        # First try the official/provider page itself when it declares poster/card artwork.
         try:
-            found=tmdb_poster(client,token,row["title"],row["content_type"],row.get("release_year"))
+            found=official_page_poster(client,row.get("source_url") or "")
         except Exception:
             found=None
 
-        # Keyless fallback for series/animation/variety.
+        # Prefer TMDB for poster-specific artwork when a token is configured.
+        if found is None:
+            try:
+                found=tmdb_poster(client,token,row["title"],row["content_type"],row.get("release_year"))
+            except Exception:
+                found=None
+
+        # Keyless TV series fallback.
         if found is None and row["content_type"] in {"series","animation","variety"}:
             try:
                 found=tvmaze_poster(client,row["title"])
+            except Exception:
+                found=None
+
+        # Final keyless online-search fallback: poster-labelled Commons assets only.
+        if found is None:
+            try:
+                found=commons_poster(client,row["title"])
             except Exception:
                 found=None
 
@@ -245,7 +335,7 @@ def main():
         "unresolved":len(missing),
         "tmdb_configured":bool(token),
         "workers":args.workers,
-        "poster_policy":"reachable TVMaze/TMDB/curated poster assets only; generated SVG and generic Wikidata P18 are rejected",
+        "poster_policy":"real reachable artwork only: trusted source/official page metadata/TMDB/TVMaze/poster-labelled Commons; generated SVG and generic P18 are rejected",
         "missing_sample":missing[:25],
     }
     print(json.dumps(report,ensure_ascii=False,indent=2))
