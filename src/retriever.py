@@ -10,6 +10,7 @@ import numpy as np
 
 from .content_intelligence import ContentIntelligenceIndex
 from .models import Candidate, SceneProfile
+from .ranking import feature_vector_score, reciprocal_rank_fusion
 
 
 def _j(value):
@@ -145,6 +146,7 @@ class CatalogRetriever:
         terms.extend(profile.tone_preferences)
         terms.extend(profile.pace_preferences)
         terms.extend(profile.surprise_preferences)
+        terms.extend(profile.required_facts)
         if profile.cognitive_load: terms.append(f'{profile.cognitive_load} cognitive load')
         if profile.popularity_preference == 'niche': terms.extend(['niche', 'less mainstream', 'hidden gem'])
         if profile.popularity_preference == 'mainstream': terms.extend(['popular', 'mainstream'])
@@ -210,6 +212,7 @@ class CatalogRetriever:
         if p.tone_preferences: parts['tone'] = len(set(p.tone_preferences)&set(c.tone_tags))/max(1,len(p.tone_preferences))
         if p.pace_preferences: parts['pace'] = len(set(p.pace_preferences)&set(c.pace_tags))/max(1,len(p.pace_preferences))
         if p.surprise_preferences: parts['surprise'] = len(set(p.surprise_preferences)&set(c.surprise_tags))/max(1,len(p.surprise_preferences))
+        if p.required_facts: parts['plot_fact'] = sum(1 for f in p.required_facts if c.content_facts.get(f) is True)/max(1,len(p.required_facts))
         if p.scene: parts['scene'] = 1.0 if p.scene in c.scene_tags else 0.0
         if p.companions: parts['companions'] = 1.0 if p.companions in c.scene_tags else 0.0
         if p.cognitive_load: parts['cognitive'] = 1.0 if p.cognitive_load == c.cognitive_load else 0.0
@@ -266,15 +269,31 @@ class CatalogRetriever:
                 vector_score=max(0.0,float(np.dot(query_vector,vector)))
             evidence_quality=max(0.0,min(1.0,c.understanding_confidence or 0.45))
             anchor_score=self._anchor_similarity(c,anchor)
+            scene_vector=feature_vector_score(c,profile)
             if anchor is None:
-                c.score=max(0.0,min(1.0,0.15*lexical+0.34*vector_score+0.43*structured+0.08*evidence_quality))
+                c.score=max(0.0,min(1.0,0.12*lexical+0.28*vector_score+0.34*structured+0.18*scene_vector+0.08*evidence_quality))
             else:
-                c.score=max(0.0,min(1.0,0.13*lexical+0.30*vector_score+0.39*structured+0.10*anchor_score+0.08*evidence_quality))
-            c.score_breakdown={"sparse":round(lexical,3),"vector":round(vector_score,3),"structured":round(structured,3),"anchor":round(anchor_score,3),"evidence_quality":round(evidence_quality,3),**{f'f_{k}':round(v,3) for k,v in parts.items()}}
+                c.score=max(0.0,min(1.0,0.10*lexical+0.25*vector_score+0.31*structured+0.16*scene_vector+0.10*anchor_score+0.08*evidence_quality))
+            c.score_breakdown={"sparse":round(lexical,3),"semantic_vector":round(vector_score,3),"scene_vector":round(scene_vector,3),"structured":round(structured,3),"anchor":round(anchor_score,3),"evidence_quality":round(evidence_quality,3),**{f'f_{k}':round(v,3) for k,v in parts.items()}}
             if profile.required_genres: c.retrieval_reasons.append('explicit_genre_gate')
             if profile.required_signals: c.retrieval_reasons.append('explicit_signal_gate')
             if semantic_terms: c.retrieval_reasons.append('canonical_semantic_query')
             if anchor is not None: c.retrieval_reasons.append('reference_title_similarity')
             candidates.append(c)
+        if candidates:
+            channel_rankings = []
+            for key in ('sparse','semantic_vector','scene_vector','structured'):
+                ordered=sorted(candidates,key=lambda x:x.score_breakdown.get(key,0.0),reverse=True)
+                channel_rankings.append([x.content_id for x in ordered])
+            if anchor is not None:
+                ordered=sorted(candidates,key=lambda x:x.score_breakdown.get('anchor',0.0),reverse=True)
+                channel_rankings.append([x.content_id for x in ordered])
+            rrf=reciprocal_rank_fusion(channel_rankings,k=60)
+            max_rrf=max(rrf.values()) if rrf else 1.0
+            for cand in candidates:
+                rrf_norm=rrf.get(cand.content_id,0.0)/max_rrf
+                cand.score=max(0.0,min(1.0,0.72*cand.score+0.28*rrf_norm))
+                cand.score_breakdown['rrf']=round(rrf_norm,3)
+                cand.retrieval_reasons.append('rrf_multi_channel_fusion')
         candidates.sort(key=lambda c:c.score,reverse=True)
         return candidates[:limit]
