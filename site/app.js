@@ -85,10 +85,12 @@ function parse(text){
 }
 function nextClarification(){
   const p=state.profile;
-  if(!p.companions){
+  const strong=Boolean(p.requiredFacts.length||p.requiredGenres.length||p.requiredSignals.length||p.sourceReference||p.popularity||p.yearMin);
+  if(strong) return null;
+  if(!p.companions&&!p.contentTypes.length){
     return {question:'这次是自己看，还是和别人一起看？',options:['一个人看','和朋友看','跟家人看','和对象看']};
   }
-  if(!p.moods.length&&!p.requiredSignals.length&&!p.scene){
+  if(!p.moods.length&&!p.requiredSignals.length&&!p.scene&&!p.requiredFacts.length){
     return {question:'你更想获得哪种感觉：轻松、刺激、治愈，还是烧脑？',options:['轻松一点','刺激一点','治愈一点','想烧脑']};
   }
   if(!p.contentTypes.length&&!p.sourceReference){
@@ -103,20 +105,21 @@ function renderClarify(item){
   $('#quick-actions').classList.add('hidden');
   scrollEnd();
 }
-function hardOk(x){const p=state.profile;
-  if(p.contentTypes.length&&!p.contentTypes.includes(x.ct))return false;
-  if(p.yearMin&&(!x.y||Number(x.y)<p.yearMin))return false;
-  if(p.runtimeMax&&(!x.rt&& !x.ert || Number(x.rt||x.ert)>p.runtimeMax))return false;
-  if(p.language==='Chinese'&&!arr(x.co).some(c=>String(c).includes('中国大陆'))&&!['中文','Chinese','Mandarin','Cantonese'].includes(x.la))return false;
-  if(p.requiredGenres.some(g=>!hasGenre(x,g)))return false;
-  if(p.avoidGenres.some(g=>hasGenre(x,g)))return false;
-  if(p.avoidRisks.some(r=>arr(x.ri).includes(r)))return false;
-  if(p.requiredFacts.some(f=>!hasFact(x,f)))return false;
-  if(p.avoidFacts.some(f=>hasFact(x,f)))return false;
-  if(p.requiredSignals.includes('funny')&&!(hasGenre(x,'Comedy')||arr(x.em).includes('funny')||arr(x.to).includes('playful')))return false;
-  if(p.requiredSignals.includes('fast')&&!(arr(x.pa).includes('fast')||arr(x.em).includes('exciting')||['Action','Thriller','Adventure'].some(g=>hasGenre(x,g))))return false;
-  return true;
+function failedConstraints(x){const p=state.profile,fail=[];
+  if(p.contentTypes.length&&!p.contentTypes.includes(x.ct))fail.push('内容形态');
+  if(p.yearMin&&(!x.y||Number(x.y)<p.yearMin))fail.push(`${p.yearMin}+ 年份`);
+  if(p.runtimeMax&&(!x.rt&&!x.ert||Number(x.rt||x.ert)>p.runtimeMax))fail.push(`≤${p.runtimeMax}分钟`);
+  if(p.language==='Chinese'&&!arr(x.co).some(c=>String(c).includes('中国大陆'))&&!['中文','Chinese','Mandarin','Cantonese'].includes(x.la))fail.push('国产/中文');
+  p.requiredGenres.filter(g=>!hasGenre(x,g)).forEach(g=>fail.push(labels[g]||g));
+  p.avoidGenres.filter(g=>hasGenre(x,g)).forEach(g=>fail.push('排除 '+(labels[g]||g)));
+  p.avoidRisks.filter(r=>arr(x.ri).includes(r)).forEach(r=>fail.push('雷点 '+(labels[r]||r)));
+  p.requiredFacts.filter(f=>!hasFact(x,f)).forEach(f=>fail.push(labels[f]||f));
+  p.avoidFacts.filter(f=>hasFact(x,f)).forEach(f=>fail.push('排除 '+(labels[f]||f)));
+  if(p.requiredSignals.includes('funny')&&!(hasGenre(x,'Comedy')||arr(x.em).includes('funny')||arr(x.to).includes('playful')))fail.push('必须好笑');
+  if(p.requiredSignals.includes('fast')&&!(arr(x.pa).includes('fast')||arr(x.em).includes('exciting')||['Action','Thriller','Adventure'].some(g=>hasGenre(x,g))))fail.push('快节奏');
+  return [...new Set(fail)];
 }
+function hardOk(x){return failedConstraints(x).length===0;}
 function overlap(a,b){if(!a.length||!b.length)return 0;const s=new Set(b);return a.filter(x=>s.has(x)).length/a.length;}
 function anchorScore(x){const ref=state.profile.sourceReference;if(!ref)return 0;const a=state.catalog.find(i=>i.t===ref||i.ot===ref||arr(i.al).includes(ref));if(!a)return 0;return 0.4*overlap(arr(a.g),arr(x.g))+0.2*overlap(arr(a.em),arr(x.em))+0.2*overlap(arr(a.to),arr(x.to))+0.2*overlap(arr(a.th),arr(x.th));}
 function score(x){const p=state.profile;let s=0;
@@ -144,6 +147,14 @@ function score(x){const p=state.profile;let s=0;
 function hash(s){let h=0;for(let i=0;i<String(s).length;i++)h=((h<<5)-h)+String(s).charCodeAt(i)|0;return Math.abs(h)}
 function recommend(){let pool=state.catalog.filter(x=>hardOk(x)&&!state.seen.has(x.id)); if(state.profile.sourceReference)pool=pool.filter(x=>x.t!==state.profile.sourceReference&&x.ot!==state.profile.sourceReference);
   pool.sort((a,b)=>score(b)-score(a)); const top=pool.slice(0,5); top.forEach(x=>state.seen.add(x.id)); return top;}
+function nearMisses(){
+  return state.catalog
+    .filter(x=>!state.seen.has(x.id))
+    .map(x=>({x,fail:failedConstraints(x)}))
+    .filter(v=>v.fail.length>0&&v.fail.length<=2)
+    .sort((a,b)=>a.fail.length-b.fail.length||score(b.x)-score(a.x))
+    .slice(0,3);
+}
 function reason(x){const p=state.profile;const bits=[];
   if(p.requiredGenres.includes('Romance'))bits.push('恋爱/关系线符合明确要求');
   if(p.requiredSignals.includes('funny'))bits.push('喜剧或好笑特征满足硬条件');
@@ -168,7 +179,21 @@ function card(x,i){
   const proof=state.profile.requiredFacts.length?`<p class="rec-proof"><b>剧情边界</b>${state.profile.requiredFacts.map(f=>esc(labels[f]||f)).join(' · ')} <span>✓</span></p>`:'';
   return `<article class="rec-card"><img class="rec-poster" src="${esc(poster)}" data-fallback="${esc(fallback)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.onerror=null;this.src=this.dataset.fallback"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(reason(x))}</p>${proof}${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><p class="rec-source">召回：硬过滤 + 稀疏特征 + 场景向量 + 内容排序</p><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button></div></article>`;
 }
-function render(items){const intro=items.length?'我先锁住你明确说出的类型、时长、平台/风险边界，再用场景和内容特征排序。探索只发生在满足硬条件的候选里。':'这组硬条件下暂时没有足够可靠的结果，可以放宽一个条件再试。';$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">此</div><div><p class="agent-intro">${intro}</p>${items.length?`<div class="recommend-list">${items.map(card).join('')}</div>`:'<div class="no-match"><p>没有找到满足全部硬条件的候选。</p></div>'}</div></div>`);profileChips();const qa=['换一批','不要有人死','结局要圆满','更轻松一点','更小众一点','给我点惊喜'];$('#quick-actions').innerHTML=qa.map(x=>`<button type="button" data-prompt="${x}">${x}</button>`).join('');$('#quick-actions').classList.remove('hidden');scrollEnd()}
+function render(items){
+  const intro=items.length?'我先把你明确说出的剧情事实和风险边界锁成硬条件，再做召回和排序。向量只负责“像不像”，不能推翻“能不能”。':'这组条件没有足够确定的候选，我不会把“未知”冒充“安全”。下面列出最接近但没过线的原因。';
+  let body='';
+  if(items.length){
+    body=`<div class="recommend-list">${items.map(card).join('')}</div>`;
+  }else{
+    const misses=nearMisses();
+    body=`<div class="no-match"><p>没有找到同时满足全部硬条件的候选。</p>${misses.length?`<div class="near-miss"><b>最接近但被拦截</b>${misses.map(({x,fail})=>`<p>《${esc(x.t)}》：缺少/冲突 ${esc(fail.join('、'))}</p>`).join('')}</div>`:''}<p class="rec-source">这里的“未知”不会自动当成“没有”：例如没有死亡证据 ≠ 已确认没人死亡。</p></div>`;
+  }
+  $('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">此</div><div><p class="agent-intro">${intro}</p>${body}</div></div>`);
+  profileChips();
+  const qa=['换一批','不要有人死','结局要圆满','不要跳吓','更小众一点','给我点惊喜'];
+  $('#quick-actions').innerHTML=qa.map(x=>`<button type="button" data-prompt="${x}">${x}</button>`).join('');
+  $('#quick-actions').classList.remove('hidden');scrollEnd();
+}
 function scrollEnd(){requestAnimationFrame(()=>window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}))}
 async function sendMessage(text){text=(text||'').trim();if(!text||state.busy)return;state.busy=true;$('#send').disabled=true;addUser(text);$('#message-input').value='';parse(text);const clarify=nextClarification();if(clarify){renderClarify(clarify);}else{render(recommend());}state.busy=false;$('#send').disabled=false;}
 function openDetail(id){
@@ -261,5 +286,5 @@ async function loadCatalog(){
   try{return await loadLiveCatalog();}
   catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.map(x=>({...x,p:posterFor(x)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
 }
-async function init(){try{const data=await loadCatalog();state.catalog=data.items||[];$('#catalog-status').innerHTML=`<i></i>${state.catalog.length.toLocaleString()} 部真实内容 · 浏览器本地检索`;$('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');}catch(e){console.error(e);toast('片库加载失败，请刷新页面')}}
+async function init(){try{const data=await loadCatalog();state.catalog=data.items||[];$('#catalog-status').innerHTML=`<i></i>${state.catalog.length.toLocaleString()} 部内容 · 海报 100% · 多通道召回`;$('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');}catch(e){console.error(e);toast('片库加载失败，请刷新页面')}}
 document.addEventListener('click',e=>{const p=e.target.closest('[data-prompt]');if(p)sendMessage(p.dataset.prompt);const d=e.target.closest('[data-detail]');if(d)openDetail(d.dataset.detail)});$('#composer').addEventListener('submit',e=>{e.preventDefault();sendMessage($('#message-input').value)});$('#message-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(e.target.value)}});$('#new-chat').addEventListener('click',reset);$('#detail-close').addEventListener('click',()=>$('#detail-dialog').close());init();
