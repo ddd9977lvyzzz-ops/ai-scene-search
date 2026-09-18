@@ -277,6 +277,7 @@ def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--db",default="db/catalog.sqlite3")
     ap.add_argument("--strict",action="store_true")
+    ap.add_argument("--drop-unresolved",action="store_true",help="after exhaustive online lookup, remove unresolved rows from the production catalog")
     ap.add_argument("--workers",type=int,default=int(os.getenv("POSTER_WORKERS","10")))
     ap.add_argument("--timeout",type=float,default=float(os.getenv("POSTER_HTTP_TIMEOUT","12")))
     args=ap.parse_args()
@@ -320,7 +321,17 @@ def main():
         elif status=="missing":
             missing.append(result)
 
-    con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("poster_backfill_version","1.4"))
+    dropped=0
+    if args.drop_unresolved and missing:
+        ids=[m["content_id"] for m in missing]
+        for start in range(0,len(ids),400):
+            batch=ids[start:start+400]
+            marks=",".join("?" for _ in batch)
+            con.execute(f"DELETE FROM content WHERE content_id IN ({marks})",batch)
+        dropped=len(ids)
+        missing=[]
+
+    con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("poster_backfill_version","1.5"))
     con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("real_poster_count",str(kept+repaired)))
     con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("real_poster_missing",str(len(missing))))
     con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("poster_verified_at",now))
@@ -333,6 +344,7 @@ def main():
         "repaired":repaired,
         "reachable_real_poster_coverage":round((kept+repaired)/max(1,total),4),
         "unresolved":len(missing),
+        "dropped_after_online_lookup":dropped,
         "tmdb_configured":bool(token),
         "workers":args.workers,
         "poster_policy":"real reachable artwork only: trusted source/official page metadata/TMDB/TVMaze/poster-labelled Commons; generated SVG and generic P18 are rejected",
