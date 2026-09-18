@@ -47,3 +47,23 @@
   .sheet-head,.auth-form{padding-left:20px;padding-right:20px}.privacy-note{padding-left:20px;padding-right:20px}
 }
 .secondary-action{height:40px;border:1px solid var(--line);border-radius:12px;background:#fff;color:#77736c;cursor:pointer;font-size:11px}
+.main-nav{display:flex;align-items:center;gap:3px;padding:4px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.82)}
+.nav-link{padding:7px 11px;border:0;border-radius:8px;background:transparent;color:#7a7771;cursor:pointer;font-size:11px}
+.nav-link.active{background:#1b1b1b;color:#fff}
+.site-view{width:min(860px,100%);margin:0 auto 34px}
+.page-head{padding:18px 0 28px;text-align:left}
+.page-head .eyebrow{margin-bottom:10px}
+.page-head h1{margin:0;font-family:"Songti SC",STSong,serif;font-size:clamp(38px,6vw,58px);font-weight:600;letter-spacing:-.05em}
+.page-head>p:last-child{max-width:620px;margin:14px 0 0;color:var(--muted);font-size:14px;line-height:1.75}
+.feature-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.feature-card{padding:20px;border:1px solid var(--line);border-radius:18px;background:#fff}
+.feature-card .feature-kicker{color:#8d8996;font-size:9px;letter-spacing:.12em}
+.feature-card h3{margin:8px 0 7px;font-size:17px}
+.feature-card p{margin:0;color:#77736d;font-size:11px;line-height:1.7}
+.feature-card button{margin-top:14px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;cursor:pointer;font-size:10px}
+.page-community,.page-library{padding:0;grid-template-columns:repeat(2,minmax(0,1fr))}
+.active-profile button.filter-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:0;border-radius:7px;color:#5545a1;background:var(--accent-soft);font-size:10px;cursor:pointer}
+.active-profile button.filter-chip:hover{background:#e7e2fb}
+.active-profile .chip-x{font-size:11px;line-height:1;color:#7b70b9}
+@media(max-width:900px){.main-nav{display:none}}
+@media(max-width:650px){.feature-grid,.page-community,.page-library{grid-template-columns:1fr}.page-head{padding-top:6px}}
