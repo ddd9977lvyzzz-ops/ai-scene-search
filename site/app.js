@@ -23,21 +23,54 @@ function toggleSave(id){
   storeSet(accountKey(),account.watchlist);renderCollection();toast(isSaved(id)?'已加入我的片单':'已取消收藏');
   document.querySelectorAll('[data-save]').forEach(function(btn){if(btn.dataset.save===id){btn.classList.toggle('saved',isSaved(id));btn.textContent=isSaved(id)?'已收藏':'收藏'}});
 }
-function renderCollection(){
-  const body=$('#collection-body');if(!body)return;
+function collectionMarkup(){
   const items=account.watchlist.map(function(id){return state.catalog.find(function(x){return x.id===id})}).filter(Boolean);
-  if(!items.length){body.innerHTML='<div class="collection-empty">还没有收藏。推荐卡片上的“收藏”会把作品放进这里。</div>';return}
-  body.innerHTML=items.map(function(x){
+  if(!items.length)return '<div class="collection-empty">还没有收藏。推荐卡片上的“收藏”会把作品放进这里。</div>';
+  return items.map(function(x){
     const platforms=arr(x.pl).map(function(p){return labels[p]||p}).join(' / ');
     const meta=[x.y,labels[x.ct]||x.ct,platforms].filter(Boolean).join(' · ');
-    return '<article class="collection-item"><img src="'+esc(posterFor(x))+'" data-fallback="'+esc(generatedPoster(x))+'" onerror="this.onerror=null;this.src=this.dataset.fallback"><div><h4>'+esc(x.t)+'</h4><p>'+esc(meta)+'</p><div class="collection-actions"><button data-detail="'+esc(x.id)+'">查看</button><button data-save="'+esc(x.id)+'">移除</button></div></div></article>';
+    return '<article class="collection-item"><img src="'+esc(posterFor(x))+'" alt="'+esc(x.t)+' 海报"><div><h4>'+esc(x.t)+'</h4><p>'+esc(meta)+'</p><div class="collection-actions"><button data-detail="'+esc(x.id)+'">查看</button><button data-save="'+esc(x.id)+'">移除</button></div></div></article>';
+  }).join('');
+}
+function renderCollection(){
+  const markup=collectionMarkup();
+  const dialog=$('#collection-body');if(dialog)dialog.innerHTML=markup;
+  const page=$('#library-page-body');if(page)page.innerHTML=markup;
+}
+function communityMarkup(){
+  return COMMUNITY_SCENES.map(function(s){
+    return '<article class="community-card"><span class="community-meta">Scene Card · 社区方案</span><h3>'+esc(s.title)+'</h3><p>'+esc(s.desc)+'</p><div class="scene-tags">'+s.tags.map(function(t){return '<span>'+esc(t)+'</span>'}).join('')+'</div><button class="save-button" data-prompt="'+esc(s.prompt)+'">用这个场景找片</button></article>';
   }).join('');
 }
 function renderCommunity(){
-  const body=$('#community-body');if(!body)return;
-  body.innerHTML=COMMUNITY_SCENES.map(function(s){
-    return '<article class="community-card"><span class="community-meta">场景方案 · Demo 社区</span><h3>'+esc(s.title)+'</h3><p>'+esc(s.desc)+'</p><div class="scene-tags">'+s.tags.map(function(t){return '<span>'+esc(t)+'</span>'}).join('')+'</div><button class="save-button" data-prompt="'+esc(s.prompt)+'">用这个场景找片</button></article>';
-  }).join('');
+  const markup=communityMarkup();
+  const dialog=$('#community-body');if(dialog)dialog.innerHTML=markup;
+  const page=$('#community-page-body');if(page)page.innerHTML=markup;
+}
+const DISCOVER_SCENES=[
+  {k:'AFTER WORK',title:'下班后不想费脑',desc:'低认知负荷、节奏顺滑、可被打断。',prompt:'今晚下班后一个人看，轻松一点，别太费脑'},
+  {k:'WITH FRIENDS',title:'朋友聚会先把气氛带起来',desc:'笑点、节奏与群体观看体验优先。',prompt:'和朋友聚会，想看节奏快又好笑的电影'},
+  {k:'PLATFORM',title:'只在一个平台里选',desc:'平台是 Hard Gate，未知可用性不会混进结果。',prompt:'我只看爱奇艺，想找2026年的国产剧'},
+  {k:'EXPLORE',title:'离开热门榜',desc:'在合法候选内增加小众和新鲜度，不突破边界。',prompt:'最近想探索小众一点的华语电影，给我点惊喜'},
+  {k:'REFERENCE',title:'从一部喜欢的作品出发',desc:'参考片只负责“像什么”，你的新条件仍然优先。',prompt:'像《功夫》一样有喜剧节奏，但换个题材'},
+  {k:'DECISION',title:'不想比较，直接替我选',desc:'保留全部约束，只输出排序最高的一个。',prompt:'别给我列表，今晚直接替我选一部轻松一点的电影'}
+];
+function renderDiscover(){
+  const body=$('#discover-grid');if(!body)return;
+  body.innerHTML=DISCOVER_SCENES.map(s=>'<article class="feature-card"><span class="feature-kicker">'+esc(s.k)+'</span><h3>'+esc(s.title)+'</h3><p>'+esc(s.desc)+'</p><button data-prompt="'+esc(s.prompt)+'">进入 Agent</button></article>').join('');
+}
+function switchView(name){
+  const agent=name==='agent';
+  $('#welcome')?.classList.toggle('hidden',!agent || !$('#conversation').classList.contains('hidden'));
+  $('#conversation')?.classList.toggle('hidden',!agent || $('#messages').children.length===0);
+  $('#agent-composer')?.classList.toggle('hidden',!agent);
+  $('#agent-system-note')?.classList.toggle('hidden',!agent);
+  ['discover','community','library'].forEach(v=>$('#view-'+v)?.classList.toggle('hidden',name!==v));
+  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+  if(name==='discover')renderDiscover();
+  if(name==='community')renderCommunity();
+  if(name==='library')renderCollection();
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 function freshProfile(){return {contentTypes:[],requiredGenres:[],avoidGenres:[],requiredSignals:[],avoidRisks:[],requiredFacts:[],avoidFacts:[],moods:[],relationship:[],tone:[],pace:[],companions:null,scene:null,cognitive:null,popularity:null,language:null,runtimeMax:null,yearMin:null,platform:null,explore:false,pickOne:false,sourceReference:null};}
 function toast(m){const n=$('#toast');n.textContent=m;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2200)}
@@ -400,46 +433,46 @@ async function loadCatalog(){
   catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.map(x=>({...x,p:posterFor(x),pl:arr(x.pl)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
 }
 async function init(){
-  loadAccount();renderCommunity();
+  loadAccount();renderCommunity();renderDiscover();
   try{
     const data=await loadCatalog();
     state.catalog=data.items||[];
     renderCollection();
-    $('#catalog-status').innerHTML=`<i></i>${state.catalog.length.toLocaleString()} 部内容 · 海报 100% · 多通道召回`;
+    $('#catalog-status').innerHTML=`<i></i>${state.catalog.length.toLocaleString()} 部内容 · 海报覆盖校验 · 多通道召回`;
     $('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');
   }catch(e){console.error(e);toast('片库加载失败，请刷新页面')}
 }
 document.addEventListener('click',e=>{
+  const nav=e.target.closest('[data-view]');if(nav){switchView(nav.dataset.view);return}
+  const rm=e.target.closest('[data-remove-filter]');if(rm){removeProfileFilter(rm.dataset.removeFilter,rm.dataset.filterValue);return}
   const p=e.target.closest('[data-prompt]');
   if(p){
     const community=$('#community-dialog');if(community&&community.open)community.close();
-    sendMessage(p.dataset.prompt);
+    switchView('agent');sendMessage(p.dataset.prompt);return;
   }
-  const d=e.target.closest('[data-detail]');if(d)openDetail(d.dataset.detail);
-  const s=e.target.closest('[data-save]');if(s)toggleSave(s.dataset.save);
-  const social=e.target.closest('[data-social]');if(social)loadSocialContext(social.dataset.social,social);
+  const d=e.target.closest('[data-detail]');if(d){openDetail(d.dataset.detail);return}
+  const s=e.target.closest('[data-save]');if(s){toggleSave(s.dataset.save);return}
+  const social=e.target.closest('[data-social]');if(social){loadSocialContext(social.dataset.social,social);return}
 });
-$('#composer').addEventListener('submit',e=>{e.preventDefault();sendMessage($('#message-input').value)});
-$('#message-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(e.target.value)}});
-$('#new-chat').addEventListener('click',reset);
-$('#detail-close').addEventListener('click',()=>$('#detail-dialog').close());
-$('#account-button').addEventListener('click',()=>{
+$('#composer')?.addEventListener('submit',e=>{e.preventDefault();sendMessage($('#message-input').value)});
+$('#message-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(e.target.value)}});
+$('#new-chat')?.addEventListener('click',()=>{reset();switchView('agent')});
+$('#detail-close')?.addEventListener('click',()=>$('#detail-dialog').close());
+$('#account-button')?.addEventListener('click',()=>{
   if(account.user){$('#auth-name').value=account.user.name;$('#auth-email').value=account.user.email}
   syncAccountUI();$('#auth-dialog').showModal();
 });
-$('#auth-close').addEventListener('click',()=>$('#auth-dialog').close());
-$('#collection-button').addEventListener('click',()=>{renderCollection();$('#collection-dialog').showModal()});
-$('#collection-close').addEventListener('click',()=>$('#collection-dialog').close());
-$('#community-button').addEventListener('click',()=>{renderCommunity();$('#community-dialog').showModal()});
-$('#community-close').addEventListener('click',()=>$('#community-dialog').close());
-$('#auth-form').addEventListener('submit',e=>{
+$('#auth-close')?.addEventListener('click',()=>$('#auth-dialog').close());
+$('#collection-close')?.addEventListener('click',()=>$('#collection-dialog').close());
+$('#community-close')?.addEventListener('click',()=>$('#community-dialog').close());
+$('#auth-form')?.addEventListener('submit',e=>{
   e.preventDefault();
   const name=$('#auth-name').value.trim(),email=$('#auth-email').value.trim().toLowerCase();
   if(!name||!email)return;
   account.user={name,email};storeSet('user',account.user);account.watchlist=storeGet(accountKey(),[]);
   syncAccountUI();renderCollection();$('#auth-dialog').close();toast('本地 Demo 账户已登录');
 });
-$('#auth-logout').addEventListener('click',()=>{
+$('#auth-logout')?.addEventListener('click',()=>{
   storeSet('user',null);account.user=null;account.watchlist=[];syncAccountUI();renderCollection();
   $('#auth-name').value='';$('#auth-email').value='';$('#auth-dialog').close();toast('已退出本地 Demo 账户');
 });
