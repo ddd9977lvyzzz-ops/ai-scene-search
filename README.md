@@ -1,5 +1,9 @@
 # 影（YING）· 场景化影视决策 Agent
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/ddd9977lvyzzz-ops/ai-scene-search)
+
+> 完整 Agent 部署时需要在 Render 中填写 `OPENAI_API_KEY` 与 `TMDB_API_TOKEN`。静态 GitHub Pages 只作为无密钥预览。
+
 一个完整的 AI Native 影视决策网站：场景 Agent、发现、社区、账户、收藏片单、平台可用性、Social Evidence 与可解释推荐。
 
 用户可以直接说：“我想看小众恋爱片”“和朋友聚会，想看轻松好笑的电影”“一个人睡前看，想治愈一点，不要太虐”“悬疑一点，但不要恐怖”“像《功夫》一样好笑的电影”。
