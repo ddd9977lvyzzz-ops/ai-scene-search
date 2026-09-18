@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -15,11 +15,13 @@ from .memory import retrieve_memories
 from .catalog_service import CatalogService
 from .event_store import EventStore
 from .features import public_feature_schema
+from .user_store import UserStore
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 CATALOG_DB = os.getenv('CATALOG_DB', str(BASE_DIR / 'db' / 'catalog.sqlite3'))
 SESSION_DB = os.getenv('SESSION_DB', str(BASE_DIR / 'db' / 'session.sqlite3'))
 EVENT_DB = os.getenv('EVENT_DB', str(BASE_DIR / 'db' / 'events.sqlite3'))
+USER_DB = os.getenv('USER_DB', str(BASE_DIR / 'db' / 'users.sqlite3'))
 WEB_DIR = BASE_DIR / 'site'
 
 if os.getenv('SESSION_BACKEND','sqlite').lower() == 'redis' and os.getenv('REDIS_URL'):
@@ -27,6 +29,7 @@ if os.getenv('SESSION_BACKEND','sqlite').lower() == 'redis' and os.getenv('REDIS
 else:
     store = SessionStore(SESSION_DB)
 events = EventStore(EVENT_DB)
+users = UserStore(USER_DB)
 catalog = CatalogService(CATALOG_DB)
 agent = SceneSearchAgent(CatalogRetriever(CATALOG_DB), store, events)
 social = agent.retriever.social
@@ -48,10 +51,81 @@ class MemoryQuery(BaseModel):
     k: int = 5
 
 
+class AuthIn(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    display_name: str = Field(min_length=1, max_length=40)
+
+
+class SceneSaveIn(BaseModel):
+    scene_id: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=120)
+    prompt: str = Field(min_length=1, max_length=1000)
+    visibility: str = 'private'
+
+
 class FeedbackIn(BaseModel):
     event_name: str
     content_id: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+
+
+def _current_user(authorization: str | None) -> dict[str,Any]:
+    token=''
+    if authorization and authorization.lower().startswith('bearer '):
+        token=authorization.split(' ',1)[1].strip()
+    user=users.user_for_token(token)
+    if not user:
+        raise HTTPException(401,'auth_required')
+    return user
+
+
+@app.post('/v1/auth/demo')
+def demo_auth(body: AuthIn):
+    try:
+        return users.login_or_register(body.email,body.display_name)
+    except ValueError:
+        raise HTTPException(400,'invalid_identity')
+
+
+@app.get('/v1/me')
+def me(authorization: str | None = Header(default=None)):
+    user=_current_user(authorization)
+    return {'user':user,'watchlist':users.list_watchlist(user['user_id']),'saved_scenes':users.list_scenes(user['user_id'])}
+
+
+@app.get('/v1/me/watchlist')
+def my_watchlist(authorization: str | None = Header(default=None)):
+    user=_current_user(authorization)
+    ids=users.list_watchlist(user['user_id'])
+    items=[]
+    for content_id in ids:
+        item=catalog.get(content_id)
+        if item: items.append(item)
+    return {'content_ids':ids,'items':items}
+
+
+@app.post('/v1/me/watchlist/{content_id:path}')
+def add_to_watchlist(content_id: str, authorization: str | None = Header(default=None)):
+    user=_current_user(authorization)
+    if not catalog.get(content_id): raise HTTPException(404,'content_not_found')
+    users.add_watchlist(user['user_id'],content_id)
+    return {'ok':True}
+
+
+@app.delete('/v1/me/watchlist/{content_id:path}')
+def remove_from_watchlist(content_id: str, authorization: str | None = Header(default=None)):
+    user=_current_user(authorization)
+    users.remove_watchlist(user['user_id'],content_id)
+    return {'ok':True}
+
+
+@app.post('/v1/me/scenes')
+def save_scene(body: SceneSaveIn, authorization: str | None = Header(default=None)):
+    user=_current_user(authorization)
+    users.save_scene(user['user_id'],body.scene_id,body.title,body.prompt,body.visibility)
+    return {'ok':True}
 
 
 @app.get('/health')
