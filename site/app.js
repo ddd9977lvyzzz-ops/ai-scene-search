@@ -5,7 +5,7 @@ const starters=['我只看爱奇艺，想找2026年的国产剧','今晚一个�
 const CONFIG=window.YING_CONFIG||{apiBase:'',preferBackend:false,pagesPreview:true};
 const state={catalog:[],profile:freshProfile(),seen:new Set(),busy:false,lastQuery:'',backendReady:false,backendSession:null,agentMode:'local-retrieval'};
 const STORAGE_PREFIX='ying:v1:';
-const account={user:null,watchlist:[]};
+const account={user:null,watchlist:[],token:null};
 const COMMUNITY_SCENES=[
   {id:'parents-safe',title:'和爸妈看，不尴尬',desc:'避开明显大尺度、跳吓和尴尬桥段，优先轻松、家庭共看友好。',tags:['家庭共看','低尴尬','轻松'],prompt:'和爸妈一起看，轻松一点，不要尴尬也不要大尺度'},
   {id:'zero-death',title:'今晚不要有人死',desc:'把“没有角色死亡”当成剧情事实硬条件；未知不会自动当安全。',tags:['没人死','低压力','硬边界'],prompt:'我想看没有任何人死去的电影，最好结局也圆满'},
@@ -81,12 +81,22 @@ function renderBackendResponse(data){
 function storeGet(key,fallback){try{const v=localStorage.getItem(STORAGE_PREFIX+key);return v?JSON.parse(v):fallback}catch(e){return fallback}}
 function storeSet(key,value){try{localStorage.setItem(STORAGE_PREFIX+key,JSON.stringify(value))}catch(e){}}
 function accountKey(){return account.user&&account.user.email?'watchlist:'+account.user.email:'watchlist:guest'}
-function loadAccount(){account.user=storeGet('user',null);account.watchlist=storeGet(accountKey(),[]);syncAccountUI()}
+function loadAccount(){account.user=storeGet('user',null);account.token=storeGet('auth_token',null);account.watchlist=storeGet(accountKey(),[]);syncAccountUI()}
+async function syncAccountFromBackend(){if(!state.backendReady||!account.token)return;try{const r=await fetch(apiUrl('/v1/me'),{headers:{Authorization:'Bearer '+account.token}});if(!r.ok)throw new Error('auth');const data=await r.json();account.user={name:data.user.display_name,email:data.user.email,user_id:data.user.user_id};account.watchlist=arr(data.watchlist);storeSet('user',account.user);storeSet(accountKey(),account.watchlist);syncAccountUI();renderCollection()}catch(e){account.token=null;storeSet('auth_token',null)}}
 function syncAccountUI(){const b=$('#account-button'),logout=$('#auth-logout');if(b)b.textContent=account.user&&account.user.name?account.user.name:'登录';if(logout)logout.classList.toggle('hidden',!account.user)}
 function isSaved(id){return account.watchlist.indexOf(id)>=0}
-function toggleSave(id){
-  if(!account.user){$('#auth-dialog').showModal();toast('先创建一个本地 Demo 账户，再保存片单');return}
-  account.watchlist=isSaved(id)?account.watchlist.filter(function(x){return x!==id}):account.watchlist.concat([id]);
+async function toggleSave(id){
+  if(!account.user){$('#auth-dialog').showModal();toast('先登录，再保存片单');return}
+  const wasSaved=isSaved(id);
+  if(state.backendReady&&account.token){
+    try{
+      const r=await fetch(apiUrl('/v1/me/watchlist/'+encodeURIComponent(id)),{
+        method:wasSaved?'DELETE':'POST',headers:{Authorization:'Bearer '+account.token}
+      });
+      if(!r.ok)throw new Error('watchlist_sync_failed');
+    }catch(e){toast('片单同步失败，请稍后重试');return}
+  }
+  account.watchlist=wasSaved?account.watchlist.filter(function(x){return x!==id}):account.watchlist.concat([id]);
   storeSet(accountKey(),account.watchlist);renderCollection();toast(isSaved(id)?'已加入我的片单':'已取消收藏');
   document.querySelectorAll('[data-save]').forEach(function(btn){if(btn.dataset.save===id){btn.classList.toggle('saved',isSaved(id));btn.textContent=isSaved(id)?'已收藏':'收藏'}});
 }
@@ -519,6 +529,7 @@ async function loadCatalog(){
 async function init(){
   loadAccount();renderCommunity();renderDiscover();
   const aiReady=await initBackend();
+  if(aiReady)await syncAccountFromBackend();
   try{
     const data=await loadCatalog();
     state.catalog=data.items||[];
@@ -550,15 +561,24 @@ $('#account-button')?.addEventListener('click',()=>{
 $('#auth-close')?.addEventListener('click',()=>$('#auth-dialog').close());
 $('#collection-close')?.addEventListener('click',()=>$('#collection-dialog').close());
 $('#community-close')?.addEventListener('click',()=>$('#community-dialog').close());
-$('#auth-form')?.addEventListener('submit',e=>{
+$('#auth-form')?.addEventListener('submit',async e=>{
   e.preventDefault();
   const name=$('#auth-name').value.trim(),email=$('#auth-email').value.trim().toLowerCase();
   if(!name||!email)return;
-  account.user={name,email};storeSet('user',account.user);account.watchlist=storeGet(accountKey(),[]);
-  syncAccountUI();renderCollection();$('#auth-dialog').close();toast('本地 Demo 账户已登录');
+  try{
+    if(state.backendReady){
+      const r=await fetch(apiUrl('/v1/auth/demo'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,display_name:name})});
+      if(!r.ok)throw new Error('login_failed');
+      const data=await r.json();account.token=data.token;account.user={name:data.user.display_name,email:data.user.email,user_id:data.user.user_id};
+      storeSet('auth_token',account.token);storeSet('user',account.user);await syncAccountFromBackend();toast('已登录完整账户模式');
+    }else{
+      account.user={name,email};storeSet('user',account.user);account.watchlist=storeGet(accountKey(),[]);toast('Pages 预览使用本地账户');
+    }
+    syncAccountUI();renderCollection();$('#auth-dialog').close();
+  }catch(err){toast('登录失败，请检查 AI 后端')}
 });
 $('#auth-logout')?.addEventListener('click',()=>{
-  storeSet('user',null);account.user=null;account.watchlist=[];syncAccountUI();renderCollection();
+  storeSet('user',null);storeSet('auth_token',null);account.user=null;account.token=null;account.watchlist=[];syncAccountUI();renderCollection();
   $('#auth-name').value='';$('#auth-email').value='';$('#auth-dialog').close();toast('已退出本地 Demo 账户');
 });
 init();
