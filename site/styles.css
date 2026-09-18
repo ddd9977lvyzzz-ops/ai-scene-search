@@ -65,5 +65,6 @@
 .active-profile button.filter-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:0;border-radius:7px;color:#5545a1;background:var(--accent-soft);font-size:10px;cursor:pointer}
 .active-profile button.filter-chip:hover{background:#e7e2fb}
 .active-profile .chip-x{font-size:11px;line-height:1;color:#7b70b9}
-@media(max-width:900px){.main-nav{display:none}}
+@media(max-width:900px){.main-nav{position:fixed;left:50%;bottom:12px;z-index:60;transform:translateX(-50%);box-shadow:0 12px 35px rgba(20,20,20,.12);background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}.agent-shell{padding-bottom:90px}.composer-dock{bottom:62px}}
 @media(max-width:650px){.feature-grid,.page-community,.page-library{grid-template-columns:1fr}.page-head{padding-top:6px}}
+.poster-broken{opacity:.28;filter:grayscale(1)}.poster-broken::after{content:"海报加载失败"}
