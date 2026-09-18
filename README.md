@@ -101,3 +101,28 @@ Romance 是 Hard Constraint，而不是弱 embedding 特征。任何不满足 Ro
 ## Repository
 
 https://github.com/ddd9977lvyzzz-ops/ai-scene-search
+
+
+## V1.2 — 深化为“观看决策 Agent”
+
+最新版本不再把产品定义为影视版“万能搜”。新增了：
+
+- **剧情事实硬约束**：支持“没有任何人死去 / 不要出轨 / 不伤害动物 / 不血腥 / 不要跳吓 / 结局圆满 / 不要大尺度”等自然语言条件。
+- **Unknown ≠ Safe**：数据库没有记录某个雷点，不会自动解释为“没有这个雷点”。
+- **Multi-channel recall**：结构化召回、稀疏特征、128d semantic index、可解释 scene vector、reference-title channel 分开，再由 RRF / reranker 融合。
+- **Near-miss explanation**：0 结果时展示最接近的候选为什么被硬条件拦截，而不是悄悄放宽条件。
+- **Decision Mode**：支持“别给列表，直接替我选一个”。
+- **Poster quality gate**：完整数据管道要求 poster coverage = 100%；源站海报缺失时生成稳定 SVG fallback，并显式标记为 generated poster。
+- **2026 国产精选层**：加入《惊蛰无声》《镖人：风起大漠》《飞驰人生3》《星河入梦》《熊猫计划之部落奇遇记》《熊出没·年年有熊》《群星闪耀时》《家业》《一瓯春》《深渊无间》等条目。
+
+完整产品定义见：
+
+- `docs/PRD_V1.2_DEEP_AGENT.md`
+- `docs/RETRIEVAL_V2.md`
+
+2026 公开信息参考：
+- 国家电影局 2026 春节档片单：https://www.chinafilm.gov.cn/xwzx/gzdt/202602/t20260209_949645.html
+- 国家电影局 2026 暑期档片单：https://www.chinafilm.gov.cn/xwzx/ywxx/202606/t20260625_996069.html
+- 爱奇艺《家业》正片页：https://www.iqiyi.com/a_131ig5wtqg5.html
+- 爱奇艺《一瓯春》正片页：https://www.iqiyi.com/a_2b9ocx2qugh.html
+- 爱奇艺《深渊无间》正片页：https://www.iqiyi.com/a_okv7zmsbr1.html
