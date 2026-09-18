@@ -2,7 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "fastapi",
   "fluid": true,
-  "regions": ["sfo1"],
+  "regions": [
+    "sfo1"
+  ],
   "buildCommand": "python scripts/bootstrap_runtime.py",
   "functions": {
     "src/app.py": {
@@ -10,5 +12,13 @@
       "includeFiles": "{site/**,db/**}",
       "excludeFiles": "{tests/**,docs/**,reports/**,.github/**}"
     }
+  },
+  "env": {
+    "TVMAZE_TARGET": "1600",
+    "CHINA_SERIES_TARGET": "180",
+    "MOVIES_PER_COUNTRY": "30",
+    "MIN_RECORDS": "1000",
+    "MIN_CHINA_SERIES": "120",
+    "DROP_UNRESOLVED_POSTERS": "1"
   }
 }
