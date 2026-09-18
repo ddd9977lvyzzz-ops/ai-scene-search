@@ -308,13 +308,14 @@ Social Score 在总排序中的权重控制在低位（当前设计约 5%），�
 
 ## 9. 版本边界
 
-### 当前 Demo 已有
+### 当前项目已实现
 
 - 场景对话
 - Plot Fact 硬约束
 - 2026 国产精选层
-- 100% 可渲染海报
+- 真实海报 Strict Gate：canonical catalog 只接受 HTTP(S) poster asset，缺失时通过 TVMaze/TMDB 回填，未补齐则构建失败
 - Verified Platform Gate（Demo 已校准爱奇艺样本）
+- OpenAI Responses API Agent Brain：语义规划 + grounded answer generation；Hard Constraints 仍由确定性代码掌控
 - 多路召回 / Scene Vector / RRF
 - Social Evidence 后端接口与真实性评分框架
 - 本地账户、收藏片单、Scene Community Demo
