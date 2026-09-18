@@ -64,6 +64,7 @@ def curated_2026_records(record_cls):
         ),
         Record(
             content_id="curated-cn26-jiaye", title="家业", content_type="series",
+            origin_platforms=["iqiyi"],
             release_year=2026, countries=["中国大陆"], language="Chinese",
             genres=["Drama","History","Romance"],
             overview="徽州贡墨案后，李祯以制墨天赋重振家业，并与骆文谦从竞争走向合作。",
@@ -71,6 +72,7 @@ def curated_2026_records(record_cls):
         ),
         Record(
             content_id="curated-cn26-yiouchun", title="一瓯春", content_type="series",
+            origin_platforms=["iqiyi"],
             release_year=2026, countries=["中国大陆"], language="Chinese",
             genres=["Drama","Romance","History"],
             overview="谢清圆与沈润在高门与朝堂暗流中互相试探、携手复仇，最终走向新生。",
@@ -78,6 +80,7 @@ def curated_2026_records(record_cls):
         ),
         Record(
             content_id="curated-cn26-shenyuan", title="深渊无间", content_type="series",
+            origin_platforms=["iqiyi"],
             release_year=2026, countries=["中国大陆"], language="Chinese",
             genres=["Thriller","Mystery","Crime"],
             overview="推理网文与多年悬案细节高度重合，新警李成在多方嫌疑人之间展开高智对弈。",
