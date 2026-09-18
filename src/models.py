@@ -30,6 +30,8 @@ class SceneProfile:
     # Safety / dislikes
     avoid_genres: list[str] = field(default_factory=list)
     avoid_risks: list[str] = field(default_factory=list)
+    required_facts: list[str] = field(default_factory=list)
+    avoid_facts: list[str] = field(default_factory=list)
 
     # Discovery controls
     exploration_mode: str = 'precise'           # precise / balanced / explore
@@ -56,7 +58,7 @@ class SceneProfile:
         list_fields = [
             'moods', 'content_types', 'genres', 'required_genres',
             'relationship_focus', 'required_signals', 'audience_preferences', 'tone_preferences', 'pace_preferences',
-            'surprise_preferences', 'avoid_genres', 'avoid_risks', 'platforms',
+            'surprise_preferences', 'avoid_genres', 'avoid_risks', 'required_facts', 'avoid_facts', 'platforms',
         ]
         for name in list_fields:
             incoming = getattr(patch, name)
@@ -103,6 +105,8 @@ class Candidate:
     tone_tags: list[str] = field(default_factory=list)
     surprise_tags: list[str] = field(default_factory=list)
     content_facts: dict[str, Any] = field(default_factory=dict)
+    fact_confidence: dict[str, float] = field(default_factory=dict)
+    poster_status: str = 'source'  # source / generated_fallback
     risk_notes: list[dict[str, Any]] = field(default_factory=list)
     surprise_notes: list[dict[str, Any]] = field(default_factory=list)
     popularity_value: Optional[float] = None
