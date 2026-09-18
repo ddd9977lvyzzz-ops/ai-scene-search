@@ -26,7 +26,7 @@ Pages 版的目的，是让面试官或评审打开链接就能体验产品逻�
 完整工程基线：
 
 - 3,339 条影视内容
-- 197 条中国大陆内容（其中以国产剧为主）
+- 3,339 条基线中包含 161 部中国大陆/中文剧集；公开重建数量会随上游数据变化
 - Structured Features + 128 维 multilingual LSA semantic retrieval
 - Hybrid Recall + Hard Constraint Filter + Feature / Scene / Semantic Rerank
 - Content Intelligence + spoiler-safe Evidence RAG
@@ -66,7 +66,7 @@ Pages 版的目的，是让面试官或评审打开链接就能体验产品逻�
 
 ## “小众恋爱片”为什么不会再跑到烧脑片
 
-该 Query 会被解析成：required_genres=[Romance]；relationship=[romantic]；popularity=niche；content_type=open；exploration=precise。
+该 Query 会被解析成：required_genres=[Romance]；relationship=[romantic]；popularity=niche；content_type=movie；exploration=precise。
 
 Romance 是 Hard Constraint，而不是弱 embedding 特征。任何不满足 Romance 的候选都会先被过滤，即使向量相似度很高也不能进入最终结果。
 
@@ -79,6 +79,24 @@ Romance 是 Hard Constraint，而不是弱 embedding 特征。任何不满足 Ro
 - Evidence Chunks：负责推荐解释和事实依据。
 
 正式工程中，影片主数据、Feature、Evidence 和 Vector 都是独立可版本化的数据层。
+
+## 数据重建
+
+仓库包含 public-data rebuild pipeline：
+
+- data_pipeline/catalog_builder.py：TVMaze + Wikidata → canonical catalog
+- scripts/migrate_content_intelligence.py：Tone / Risk / Surprise / Content Facts
+- scripts/migrate_evidence_corpus.py：Evidence chunks
+- scripts/build_embeddings.py：128d multilingual LSA
+- scripts/verify_catalog.py：质量门槛
+- scripts/bootstrap_runtime.py：容器首次启动自动完成上述流程
+
+注意：公开 API 重建是可复现工程路径，不保证每次得到完全相同的条目数量；README 中 3,339 / 161 是已验证基线，不把动态上游数量伪装成固定生产数据。
+
+## 文档
+
+- docs/PRD.md：完整产品边界、Feature Schema、召回排序、RAG、调试指标
+- docs/ARCHITECTURE.md：存储、向量、Redis、确定性与探索边界
 
 ## Repository
 
