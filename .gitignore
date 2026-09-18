@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
+.DS_Store
+# Runtime/build artifacts: rebuilt deterministically from site/catalog.min.json
+db/*.sqlite3
+db/*.sqlite3-*
+db/*.joblib
