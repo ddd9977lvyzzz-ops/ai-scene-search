@@ -11,7 +11,7 @@
   <header class="topbar">
     <a class="brand" href="./" aria-label="此刻看什么首页"><span class="brand-mark">此刻</span><span>看什么</span></a>
     <div class="top-actions">
-      <span class="catalog-status" id="catalog-status"><i></i>正在加载 3,339 条片库</span>
+      <span class="catalog-status" id="catalog-status"><i></i>正在加载在线内容库</span>
       <button class="quiet-button" id="new-chat" type="button">新对话</button>
     </div>
   </header>
@@ -30,11 +30,11 @@
         <button class="send" id="send" type="submit" aria-label="发送">发送</button>
       </form>
       <div class="quick-actions hidden" id="quick-actions"></div>
-      <p class="footnote">GitHub Pages 作品集模式：3,339 条真实内容在浏览器本地完成硬过滤与场景重排；完整 FastAPI 版本包含向量召回、Evidence RAG 与会话存储。</p>
+      <p class="footnote">GitHub Pages 作品集模式：浏览器加载公开内容库并执行硬过滤与场景重排；外部数据失败时自动使用精选兜底片单。完整 3,339 条 FastAPI 版本包含向量召回、Evidence RAG 与会话存储。</p>
     </section>
     <details class="system-note">
       <summary>数据与检索说明</summary>
-      <div class="system-grid"><p id="data-note">3,339 部内容 · 160+ 国产剧 · 海报字段 100%</p><p>硬约束 → 特征匹配 → 场景排序 → 探索控制</p></div>
+      <div class="system-grid"><p id="data-note">在线 Demo：公开内容源 + 精选国产片单 · 完整工程：3,339 条内容</p><p>硬约束 → 特征匹配 → 场景排序 → 探索控制</p></div>
     </details>
   </main>
   <dialog class="detail-dialog" id="detail-dialog"><button class="dialog-close" id="detail-close" type="button" aria-label="关闭">×</button><div id="detail-body"></div></dialog>
