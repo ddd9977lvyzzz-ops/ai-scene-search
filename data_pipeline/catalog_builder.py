@@ -295,15 +295,16 @@ def tvmaze_records(fetcher: Fetcher, target: int) -> list[Record]:
 def _wd_value(binding: dict, key: str) -> str:
     return (binding.get(key) or {}).get("value") or ""
 
-def wikidata_records(fetcher: Fetcher, *, kind: str, country_qid: str, limit: int) -> list[Record]:
+def wikidata_records(fetcher: Fetcher, *, kind: str, country_qid: str, limit: int, require_image: bool = False) -> list[Record]:
     instance_qid = "Q11424" if kind == "movie" else "Q5398426"
     # Oversample because OPTIONAL genre rows can duplicate the same work.
+    image_clause = "?item wdt:P18 ?image." if require_image else "OPTIONAL { ?item wdt:P18 ?image. }"
     q = f"""
     SELECT ?item ?itemLabel ?itemDescription ?date ?image ?genreLabel WHERE {{
       ?item wdt:P31 wd:{instance_qid};
             wdt:P495 wd:{country_qid}.
       OPTIONAL {{ ?item wdt:P577 ?date. }}
-      OPTIONAL {{ ?item wdt:P18 ?image. }}
+      {image_clause}
       OPTIONAL {{ ?item wdt:P136 ?genre. }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "zh,en".
         ?item rdfs:label ?itemLabel.
@@ -359,8 +360,9 @@ def wikidata_records(fetcher: Fetcher, *, kind: str, country_qid: str, limit: in
     return out
 
 def china_series_records(fetcher: Fetcher, limit: int) -> list[Record]:
-    # Direct Wikidata series query provides a China-focused floor independent of TVMaze coverage.
-    return wikidata_records(fetcher, kind="series", country_qid="Q148", limit=limit)
+    # China-focused floor: require a source image so the production poster/artwork gate
+    # does not erase the entire domestic catalog after enrichment.
+    return wikidata_records(fetcher, kind="series", country_qid="Q148", limit=limit, require_image=True)
 
 def merge_records(records: list[Record]) -> list[Record]:
     by_key: dict[tuple, Record] = {}
