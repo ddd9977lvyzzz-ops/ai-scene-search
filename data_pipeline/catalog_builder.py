@@ -476,7 +476,7 @@ def write_db(path: str, records: list[Record]) -> None:
         rows.append((
             r.content_id,r.title,r.original_title,json_text(r.aliases),r.content_type,r.release_year,
             r.runtime_minutes,r.episode_runtime_minutes,json_text(r.countries),r.language,json_text(r.genres),
-            r.overview,(r.poster_url or generated_poster_url(r.title,r.release_year)),r.backdrop_url,json_text(r.origin_platforms),json_text(r.cast),
+            r.overview,r.poster_url,r.backdrop_url,json_text(r.origin_platforms),json_text(r.cast),
             json_text(r.directors),json_text(r.creators),r.source,r.source_id,r.source_url,
             search_text(r,f),json_text(f["scene_tags"]),json_text(f["emotion_tags"]),json_text(f["watching_tags"]),
             json_text(f["audience_tags"]),json_text(f["pace_tags"]),json_text(f["risk_tags"]),
@@ -495,7 +495,7 @@ def write_db(path: str, records: list[Record]) -> None:
         pass
     meta={
         "schema_version":SCHEMA_VERSION,
-        "poster_policy":"source_or_generated_svg_fallback",
+        "poster_policy":"real_source_only_backfill_required",
         "record_count":str(len(records)),
         "builder":"public_api_catalog_builder_v1",
         "sources":"tvmaze,wikidata,curated_2026_official_public_pages",
