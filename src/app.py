@@ -135,6 +135,8 @@ def save_scene(body: SceneSaveIn, authorization: str | None = Header(default=Non
 
 @app.get('/health')
 def health():
+    if agent.brain.required and not agent.brain.enabled:
+        raise HTTPException(503,'openai_agent_not_configured')
     return {'ok': True, 'version': '1.3.0', 'catalog_count': catalog.count(), 'catalog_db': str(Path(CATALOG_DB).resolve()), 'catalog_quality': catalog.quality_stats(), 'agent_mode': agent.brain.mode, 'openai_agent_enabled': agent.brain.enabled, 'social_connectors': social.configured()}
 
 
