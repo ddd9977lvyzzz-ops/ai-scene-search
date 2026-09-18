@@ -4,7 +4,7 @@ from .filtering import hard_filter
 from .reranker import rerank
 from .reasoner import reason
 from .evidence_store import EvidenceStore
-from .llm_intent import enrich_soft_profile, enabled as llm_intent_enabled
+from .llm_agent import LLMAgentBrain
 
 RELAXING = {'light', 'relaxing', 'healing'}
 HIGH_AROUSAL = {'exciting', 'tense', 'scary', 'thought_provoking'}
@@ -69,6 +69,7 @@ class SceneSearchAgent:
         self.store = store
         self.event_store = event_store
         self.evidence_store = EvidenceStore(retriever.con)
+        self.brain = LLMAgentBrain()
 
     def chat(self, session_id: str, text: str):
         state = self.store.get(session_id)
@@ -76,19 +77,25 @@ class SceneSearchAgent:
         profile, exposed, turn = state
         patch = parse_intent(text)
         profile.merge(patch)
-        llm_patch=enrich_soft_profile(text)
-        if llm_patch is not None: profile.merge(llm_patch)
+        plan=self.brain.plan(text, profile)
+        llm_patch=self.brain.soft_patch(plan)
+        if llm_patch is not None:
+            profile.merge(llm_patch)
         apply_relative_commands(profile, text)
         turn += 1
         q = clarification_question(profile)
+        if not q and plan and plan.get('needs_clarification'):
+            q = plan.get('clarification_question')
         if q:
             self.store.save(session_id, profile, exposed, turn)
             if self.event_store: self.event_store.log('clarify_shown', session_id, payload={'turn': turn, 'question': q})
-            return {'type':'clarify','session_id':session_id,'turn':turn,'profile':profile.to_dict(),'question':q,'options':clarification_options(q)}
+            return {'type':'clarify','session_id':session_id,'turn':turn,'profile':profile.to_dict(),'question':q,'options':clarification_options(q),'agent_mode':self.brain.mode,'llm_plan':plan}
 
-        retrieved = self.retriever.retrieve(text, profile, limit=140, exclude_ids=exposed)
+        retrieval_text=(plan or {}).get('query_rewrite') or text
+        retrieved = self.retriever.retrieve(retrieval_text, profile, limit=140, exclude_ids=exposed)
         kept, dropped = hard_filter(retrieved, profile)
-        ranked = rerank(kept, profile, top_k=5)
+        top_k=1 if ((plan or {}).get('decision_style')=='pick_one' or any(x in text for x in ['只给我一个','直接选一个','替我选一个','帮我拍板','别给列表'])) else 5
+        ranked = rerank(kept, profile, top_k=top_k)
         if not ranked:
             self.store.save(session_id, profile, exposed, turn)
             counter={}
