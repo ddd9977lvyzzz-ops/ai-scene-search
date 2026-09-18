@@ -210,7 +210,44 @@ function reason(x){const p=state.profile;const bits=[];
   if(vectorScore(x)>.25)bits.push('场景特征向量相似度较高');
   if(p.sourceReference&&anchorScore(x)>.15)bits.push(`与《${p.sourceReference}》在类型/氛围上有相似点`);
   return bits.slice(0,3).join('；')||'在当前合法候选里，综合类型、场景和内容理解得分靠前。';}
-function profileChips(){const p=state.profile;const raw=[p.companions,p.scene,...p.moods,p.cognitive,...p.contentTypes,...p.requiredGenres,...p.relationship,...p.pace].filter(Boolean);let vals=raw.map(x=>labels[x]||x);if(p.language)vals.push('中文/国产');if(p.sourceReference)vals.push(`类似《${p.sourceReference}》`);if(p.popularity)vals.push(labels[p.popularity]);if(p.runtimeMax)vals.push(`≤ ${p.runtimeMax} 分钟`);if(p.yearMin)vals.push(`${p.yearMin}+`);if(p.platform)vals.push(`只看 ${labels[p.platform]||p.platform}`);if(p.pickOne)vals.push('帮我拍板');p.requiredFacts.forEach(x=>vals.push(labels[x]||x));if(p.explore)vals.push('探索模式');p.avoidGenres.forEach(x=>vals.push(`不要 ${labels[x]||x}`));p.avoidRisks.forEach(x=>vals.push(x==='emotionally_heavy'?'不要太虐':x==='fear_or_horror'?'不要惊吓':`避开 ${x}`));const n=$('#active-profile');n.innerHTML=[...new Set(vals)].map(x=>`<span>${esc(x)}</span>`).join('');n.classList.toggle('hidden',!vals.length)}
+function profileChipData(){
+  const p=state.profile, chips=[];
+  const add=(key,value,label)=>{if(value!==null&&value!==undefined&&value!=='')chips.push({key,value,label})};
+  add('companions',p.companions,labels[p.companions]||p.companions);
+  add('scene',p.scene,labels[p.scene]||p.scene);
+  p.moods.forEach(v=>add('moods',v,labels[v]||v));
+  add('cognitive',p.cognitive,labels[p.cognitive]||p.cognitive);
+  p.contentTypes.forEach(v=>add('contentTypes',v,labels[v]||v));
+  p.requiredGenres.forEach(v=>add('requiredGenres',v,labels[v]||v));
+  p.relationship.forEach(v=>add('relationship',v,labels[v]||v));
+  p.pace.forEach(v=>add('pace',v,labels[v]||v));
+  if(p.language)add('language',p.language,'中文/国产');
+  if(p.sourceReference)add('sourceReference',p.sourceReference,`类似《${p.sourceReference}》`);
+  if(p.popularity)add('popularity',p.popularity,labels[p.popularity]||p.popularity);
+  if(p.runtimeMax)add('runtimeMax',String(p.runtimeMax),`≤ ${p.runtimeMax} 分钟`);
+  if(p.yearMin)add('yearMin',String(p.yearMin),`${p.yearMin}+`);
+  if(p.platform)add('platform',p.platform,`只看 ${labels[p.platform]||p.platform}`);
+  if(p.pickOne)add('pickOne','1','帮我拍板');
+  p.requiredFacts.forEach(v=>add('requiredFacts',v,labels[v]||v));
+  if(p.explore)add('explore','1','探索模式');
+  p.avoidGenres.forEach(v=>add('avoidGenres',v,`不要 ${labels[v]||v}`));
+  p.avoidRisks.forEach(v=>add('avoidRisks',v,v==='emotionally_heavy'?'不要太虐':v==='fear_or_horror'?'不要惊吓':`避开 ${labels[v]||v}`));
+  const seen=new Set();return chips.filter(x=>{const k=x.key+'|'+x.value;if(seen.has(k))return false;seen.add(k);return true});
+}
+function removeProfileFilter(key,value){
+  const p=state.profile;
+  const arrays=new Set(['moods','contentTypes','requiredGenres','relationship','pace','requiredFacts','avoidGenres','avoidRisks']);
+  if(arrays.has(key))p[key]=p[key].filter(x=>String(x)!==String(value));
+  else if(key==='runtimeMax'||key==='yearMin')p[key]=null;
+  else if(key==='pickOne'||key==='explore')p[key]=false;
+  else if(Object.prototype.hasOwnProperty.call(p,key))p[key]=null;
+  profileChips();toast('已移除条件');
+}
+function profileChips(){
+  const chips=profileChipData(), n=$('#active-profile');
+  n.innerHTML=chips.map(x=>`<button class="filter-chip" type="button" data-remove-filter="${esc(x.key)}" data-filter-value="${esc(x.value)}" title="点击删除条件"><span>${esc(x.label)}</span><span class="chip-x">×</span></button>`).join('');
+  n.classList.toggle('hidden',!chips.length);
+}
 function startConversation(){$('#welcome').classList.add('hidden');$('#conversation').classList.remove('hidden')}
 function addUser(t){startConversation();$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-user"><p>${esc(t)}</p></div>`)}
 function card(x,i){
