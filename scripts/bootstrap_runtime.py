@@ -34,6 +34,17 @@ def main():
     if healthy():
         print(f'catalog ready: {DB}', flush=True)
         return
+
+    # Vercel deploys must stay deterministic and fast. Building a 1000+ title catalog,
+    # crawling poster sources, and fitting embeddings during the Vercel build is too fragile.
+    # GitHub Actions publishes an audited db/catalog.sqlite3 + embedding_model.joblib bundle.
+    if os.getenv('VERCEL'):
+        raise SystemExit(
+            "Bundled catalog runtime is missing or failed quality checks. "
+            "Wait for the GitHub 'Refresh canonical catalog' workflow to publish "
+            "db/catalog.sqlite3 and db/embedding_model.joblib, then redeploy."
+        )
+
     run(sys.executable,'data_pipeline/catalog_builder.py','--db',str(DB),
         '--tvmaze-target',os.getenv('TVMAZE_TARGET','3000'),
         '--china-series-target',os.getenv('CHINA_SERIES_TARGET','220'),
@@ -41,7 +52,7 @@ def main():
         '--min-records',os.getenv('MIN_RECORDS','1000'),
         '--min-china-series',os.getenv('MIN_CHINA_SERIES','120'))
     poster_cmd=[sys.executable,'scripts/backfill_real_posters.py','--db',str(DB),'--strict']
-    if os.getenv('DROP_UNRESOLVED_POSTERS','').lower() in {'1','true','yes'} or os.getenv('VERCEL'):
+    if os.getenv('DROP_UNRESOLVED_POSTERS','').lower() in {'1','true','yes'}:
         poster_cmd.append('--drop-unresolved')
     run(*poster_cmd)
     run(sys.executable,'scripts/migrate_content_intelligence.py','--db',str(DB))
