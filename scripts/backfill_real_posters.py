@@ -7,7 +7,7 @@ Poster acceptance policy:
 2. TVMaze primary images are trusted poster-format assets for TV/series records.
 3. TMDB poster_path is preferred for missing/broken poster artwork (requires TMDB_API_TOKEN).
 4. Curated poster URLs are accepted only after network verification.
-5. Generic Wikidata P18 is not considered poster-specific provenance by itself.
+5. Generic Wikidata P18 is only accepted as a last-resort reachable source artwork after poster-specific lookups fail.
 
 The script never writes generated SVG placeholders. In strict mode every row must end with a
 reachable image, otherwise the catalog build fails.
@@ -259,6 +259,18 @@ def resolve_one(row: dict, token: str, timeout: float):
                 found=commons_poster(client,row["title"])
             except Exception:
                 found=None
+
+        # Last-resort source artwork for Wikidata media records. We only accept the row's
+        # existing P18 after all poster-specific lookups fail, and only when the URL is
+        # actually reachable. This preserves domestic catalog coverage without generated art.
+        if found is None and source=="wikidata" and reachable_image(client,existing):
+            found={
+                "url":existing,
+                "provider":"wikidata_p18_source_artwork",
+                "provider_id":row.get("source_id") or "",
+                "source_url":row.get("source_url") or "",
+                "confidence":.72,
+            }
 
         if found:
             return {"status":"repaired","content_id":row["content_id"],**found}
