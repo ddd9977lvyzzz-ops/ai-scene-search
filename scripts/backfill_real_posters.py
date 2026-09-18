@@ -1,22 +1,24 @@
 from __future__ import annotations
 
-"""Backfill REAL poster artwork into the canonical catalog.
+"""Backfill and verify REAL poster artwork in the canonical YING catalog.
 
-Priority:
-1) existing HTTP poster
-2) TVMaze show images (free public API, series)
-3) TMDB search + poster_path (movies/TV; requires TMDB_API_TOKEN)
+Poster acceptance policy:
+1. A poster must be an HTTP(S) image that can actually be fetched.
+2. TVMaze primary images are trusted poster-format assets for TV/series records.
+3. TMDB poster_path is preferred for missing/broken poster artwork (requires TMDB_API_TOKEN).
+4. Curated poster URLs are accepted only after network verification.
+5. Generic Wikidata P18 is not considered poster-specific provenance by itself.
 
-The script never writes generated SVG placeholders. In strict mode unresolved titles fail the build.
+The script never writes generated SVG placeholders. In strict mode every row must end with a
+reachable image, otherwise the catalog build fails.
 """
 
 import argparse
 import json
 import os
 import sqlite3
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-from urllib.parse import quote
 
 import httpx
 
@@ -39,6 +41,37 @@ def valid_real_url(url: str | None) -> bool:
     return u.startswith("https://") or u.startswith("http://")
 
 
+def reachable_image(client: httpx.Client, url: str) -> bool:
+    if not valid_real_url(url):
+        return False
+    try:
+        with client.stream(
+            "GET",
+            url,
+            headers={"Range":"bytes=0-2047","Accept":"image/avif,image/webp,image/apng,image/*,*/*;q=0.8"},
+        ) as r:
+            if r.status_code not in {200,206}:
+                return False
+            ctype=(r.headers.get("content-type") or "").lower()
+            if ctype.startswith("image/"):
+                return True
+            # Some CDNs omit/lie about content-type. Read only the first small chunk and inspect magic bytes.
+            first=b""
+            for chunk in r.iter_bytes():
+                first+=chunk
+                if len(first)>=32:
+                    break
+            return (
+                first.startswith(b"\xff\xd8\xff") or
+                first.startswith(b"\x89PNG\r\n\x1a\n") or
+                first.startswith(b"RIFF") or
+                first.startswith(b"GIF8") or
+                first.startswith(b"BM")
+            )
+    except Exception:
+        return False
+
+
 def pick_year_match(results, year):
     if not results:
         return None
@@ -47,7 +80,8 @@ def pick_year_match(results, year):
     def score(r):
         date=r.get("release_date") or r.get("first_air_date") or ""
         ry=int(date[:4]) if len(date)>=4 and date[:4].isdigit() else None
-        return (0 if ry==year else 1 if ry and abs(ry-year)<=1 else 2, -(r.get("popularity") or 0))
+        exact=0 if ry==year else 1 if ry and abs(ry-year)<=1 else 2
+        return (exact, -(r.get("popularity") or 0))
     return sorted(results,key=score)[0]
 
 
@@ -59,7 +93,7 @@ def tvmaze_poster(client: httpx.Client, title: str):
     data=r.json()
     image=data.get("image") or {}
     url=image.get("original") or image.get("medium")
-    if not valid_real_url(url):
+    if not valid_real_url(url) or not reachable_image(client,url):
         return None
     return {
         "url":url,
@@ -86,93 +120,135 @@ def tmdb_poster(client: httpx.Client, token: str, title: str, content_type: str,
     best=pick_year_match(r.json().get("results") or [],year)
     if not best or not best.get("poster_path"):
         return None
+    url="https://image.tmdb.org/t/p/w500"+best["poster_path"]
+    if not reachable_image(client,url):
+        return None
     return {
-        "url":"https://image.tmdb.org/t/p/w500"+best["poster_path"],
+        "url":url,
         "provider":"tmdb",
         "provider_id":str(best.get("id") or ""),
         "source_url":f"https://www.themoviedb.org/{'movie' if kind=='movie' else 'tv'}/{best.get('id')}",
-        "confidence":.94 if year else .86,
+        "confidence":.95 if year else .88,
     }
+
+
+def resolve_one(row: dict, token: str, timeout: float):
+    with httpx.Client(
+        timeout=timeout,
+        follow_redirects=True,
+        headers={"User-Agent":"YING/1.4 poster-auditor"},
+    ) as client:
+        existing=row.get("poster_url") or ""
+        source=(row.get("source") or "").lower()
+
+        trusted_provenance=(
+            source=="tvmaze"
+            or source.endswith("_curated")
+            or source.startswith("manual_")
+        )
+        if trusted_provenance and reachable_image(client,existing):
+            return {
+                "status":"kept",
+                "content_id":row["content_id"],
+                "url":existing,
+                "provider":source or "source",
+                "provider_id":row.get("source_id") or "",
+                "source_url":row.get("source_url") or "",
+                "confidence":.95,
+            }
+
+        # Prefer TMDB for poster-specific artwork.
+        try:
+            found=tmdb_poster(client,token,row["title"],row["content_type"],row.get("release_year"))
+        except Exception:
+            found=None
+
+        # Keyless fallback for series/animation/variety.
+        if found is None and row["content_type"] in {"series","animation","variety"}:
+            try:
+                found=tvmaze_poster(client,row["title"])
+            except Exception:
+                found=None
+
+        if found:
+            return {"status":"repaired","content_id":row["content_id"],**found}
+
+        return {
+            "status":"missing",
+            "content_id":row["content_id"],
+            "title":row["title"],
+            "type":row["content_type"],
+            "year":row.get("release_year"),
+            "previous_url":existing,
+        }
 
 
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--db",default="db/catalog.sqlite3")
     ap.add_argument("--strict",action="store_true")
-    ap.add_argument("--sleep",type=float,default=.04)
+    ap.add_argument("--workers",type=int,default=int(os.getenv("POSTER_WORKERS","10")))
+    ap.add_argument("--timeout",type=float,default=float(os.getenv("POSTER_HTTP_TIMEOUT","12")))
     args=ap.parse_args()
 
     token=os.getenv("TMDB_API_TOKEN","").strip()
     con=sqlite3.connect(args.db)
     con.row_factory=sqlite3.Row
     con.executescript(DDL)
-    rows=con.execute("""
+    rows=[dict(r) for r in con.execute("""
       SELECT content_id,title,content_type,release_year,poster_url,source,source_id,source_url
       FROM content ORDER BY content_id
-    """).fetchall()
+    """).fetchall()]
 
     now=datetime.now(timezone.utc).isoformat()
-    missing=[]
-    repaired=0
-    kept=0
-    with httpx.Client(timeout=15,follow_redirects=True,headers={"User-Agent":"YING/1.3 poster-backfill"}) as client:
-        for row in rows:
-            existing=row["poster_url"] or ""
-            source=(row["source"] or "").lower()
-            # TVMaze primary show images are documented as poster-format images. Curated records
-            # are manually sourced poster assets. Generic Wikidata P18 is NOT automatically treated
-            # as a poster because it can be a still, logo, or other image.
-            trusted_existing = valid_real_url(existing) and (
-                source=="tvmaze" or source.endswith("_curated") or source.startswith("manual_")
-            )
-            if trusted_existing:
-                kept+=1
-                con.execute(
-                    "INSERT OR REPLACE INTO poster_assets VALUES (?,?,?,?,?,?,?)",
-                    (row["content_id"],existing,source or "source",row["source_id"] or "",row["source_url"] or "",.94,now)
-                )
-                continue
-
-            found=None
-            # TMDB is the preferred backfill because poster_path is explicitly poster artwork.
+    results=[]
+    with ThreadPoolExecutor(max_workers=max(1,args.workers)) as pool:
+        futures=[pool.submit(resolve_one,row,token,args.timeout) for row in rows]
+        for idx,future in enumerate(as_completed(futures),start=1):
             try:
-                found=tmdb_poster(client,token,row["title"],row["content_type"],row["release_year"])
-            except Exception:
-                found=None
+                results.append(future.result())
+            except Exception as exc:
+                results.append({"status":"error","error":str(exc)[:250]})
+            if idx%250==0:
+                print(f"poster audit: {idx}/{len(rows)}",flush=True)
 
-            # If TMDB is unavailable or has no match, TVMaze is a keyless fallback for series.
-            if found is None and row["content_type"] in {"series","animation","variety"}:
-                try:
-                    found=tvmaze_poster(client,row["title"])
-                except Exception:
-                    found=None
-
-            if found:
-                con.execute("UPDATE content SET poster_url=? WHERE content_id=?",(found["url"],row["content_id"]))
-                con.execute(
-                    "INSERT OR REPLACE INTO poster_assets VALUES (?,?,?,?,?,?,?)",
-                    (row["content_id"],found["url"],found["provider"],found["provider_id"],found["source_url"],found["confidence"],now)
+    missing=[]
+    kept=repaired=0
+    for result in results:
+        status=result.get("status")
+        if status in {"kept","repaired"}:
+            if status=="kept": kept+=1
+            else: repaired+=1
+            con.execute("UPDATE content SET poster_url=? WHERE content_id=?",(result["url"],result["content_id"]))
+            con.execute(
+                "INSERT OR REPLACE INTO poster_assets VALUES (?,?,?,?,?,?,?)",
+                (
+                    result["content_id"],result["url"],result["provider"],result.get("provider_id") or "",
+                    result.get("source_url") or "",float(result["confidence"]),now,
                 )
-                repaired+=1
-            else:
-                missing.append({"content_id":row["content_id"],"title":row["title"],"type":row["content_type"],"year":row["release_year"]})
-            time.sleep(args.sleep)
+            )
+        elif status=="missing":
+            missing.append(result)
 
-    con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("poster_backfill_version","1.0"))
+    con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("poster_backfill_version","1.4"))
     con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("real_poster_count",str(kept+repaired)))
     con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("real_poster_missing",str(len(missing))))
+    con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",("poster_verified_at",now))
     con.commit()
+
     total=len(rows)
-    print(json.dumps({
+    report={
         "records":total,
-        "existing_real":kept,
+        "existing_verified":kept,
         "repaired":repaired,
-        "real_poster_coverage":round((kept+repaired)/max(1,total),4),
+        "reachable_real_poster_coverage":round((kept+repaired)/max(1,total),4),
         "unresolved":len(missing),
         "tmdb_configured":bool(token),
-        "poster_policy":"TVMaze/TMDB/curated poster assets only; generic Wikidata P18 is not sufficient",
+        "workers":args.workers,
+        "poster_policy":"reachable TVMaze/TMDB/curated poster assets only; generated SVG and generic Wikidata P18 are rejected",
         "missing_sample":missing[:25],
-    },ensure_ascii=False,indent=2))
+    }
+    print(json.dumps(report,ensure_ascii=False,indent=2))
     con.close()
 
     if args.strict and missing:
