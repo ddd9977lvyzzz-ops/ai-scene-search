@@ -1,0 +1,49 @@
+name: Refresh canonical catalog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "20 18 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-latest
+    env:
+      TMDB_API_TOKEN: ${{ secrets.TMDB_API_TOKEN }}
+      MIN_RECORDS: "1000"
+      MIN_CHINA_SERIES: "120"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install catalog dependencies
+        run: pip install httpx numpy scikit-learn joblib
+      - name: Require TMDB poster token
+        run: |
+          test -n "$TMDB_API_TOKEN" || (echo "Add repository secret TMDB_API_TOKEN before running strict poster refresh" && exit 1)
+      - name: Build public catalog
+        run: |
+          python data_pipeline/catalog_builder.py --db /tmp/catalog.sqlite3 --tvmaze-target 3000 --china-series-target 220 --movies-per-country 70 --min-records "$MIN_RECORDS" --min-china-series "$MIN_CHINA_SERIES"
+      - name: Backfill real posters
+        run: python scripts/backfill_real_posters.py --db /tmp/catalog.sqlite3 --strict
+      - name: Add content intelligence
+        run: |
+          python scripts/migrate_content_intelligence.py --db /tmp/catalog.sqlite3
+          python scripts/migrate_platform_availability.py --db /tmp/catalog.sqlite3
+          python scripts/migrate_evidence_corpus.py --db /tmp/catalog.sqlite3
+      - name: Build semantic index
+        run: python scripts/build_embeddings.py --db /tmp/catalog.sqlite3 --model /tmp/embedding_model.joblib --dim 128
+      - name: Strict quality gate
+        run: python scripts/verify_catalog.py --db /tmp/catalog.sqlite3 --min-records "$MIN_RECORDS" --min-china-series "$MIN_CHINA_SERIES"
+      - name: Upload audited catalog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ying-catalog-audited
+          path: |
+            /tmp/catalog.sqlite3
+            /tmp/embedding_model.joblib
+          retention-days: 7
