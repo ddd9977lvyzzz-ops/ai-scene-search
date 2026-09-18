@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "fluid": true,
+  "regions": ["sfo1"],
+  "buildCommand": "python scripts/bootstrap_runtime.py",
+  "functions": {
+    "src/app.py": {
+      "maxDuration": 60,
+      "includeFiles": "{site/**,db/**}",
+      "excludeFiles": "{tests/**,docs/**,reports/**,.github/**}"
+    }
+  }
+}
