@@ -96,7 +96,7 @@ function collectionMarkup(){
   return items.map(function(x){
     const platforms=arr(x.pl).map(function(p){return labels[p]||p}).join(' / ');
     const meta=[x.y,labels[x.ct]||x.ct,platforms].filter(Boolean).join(' · ');
-    return '<article class="collection-item"><img src="'+esc(posterFor(x))+'" alt="'+esc(x.t)+' 海报"><div><h4>'+esc(x.t)+'</h4><p>'+esc(meta)+'</p><div class="collection-actions"><button data-detail="'+esc(x.id)+'">查看</button><button data-save="'+esc(x.id)+'">移除</button></div></div></article>';
+    return '<article class="collection-item"><img src="'+esc(posterFor(x))+'" alt="'+esc(x.t)+' 海报" onerror="this.classList.add(\'poster-broken\');this.alt=\'海报加载失败\'"><div><h4>'+esc(x.t)+'</h4><p>'+esc(meta)+'</p><div class="collection-actions"><button data-detail="'+esc(x.id)+'">查看</button><button data-save="'+esc(x.id)+'">移除</button></div></div></article>';
   }).join('');
 }
 function renderCollection(){
@@ -155,7 +155,8 @@ function generatedPoster(x){
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${h1} 35% 18%)"/><stop offset="1" stop-color="hsl(${h2} 48% 44%)"/></linearGradient></defs><rect width="600" height="900" rx="28" fill="url(#g)"/><circle cx="485" cy="155" r="130" fill="white" opacity=".08"/><circle cx="80" cy="760" r="180" fill="white" opacity=".06"/><text x="52" y="650" fill="white" font-family="system-ui, sans-serif" font-size="25" opacity=".72">SCENE • ${year}</text><foreignObject x="48" y="680" width="510" height="160"><div xmlns="http://www.w3.org/1999/xhtml" style="font:700 58px/1.15 system-ui;color:white;letter-spacing:-2px;word-break:break-all">${esc(title)}</div></foreignObject><text x="52" y="850" fill="white" font-family="system-ui, sans-serif" font-size="18" opacity=".62">YING · DEMO POSTER</text></svg>`;
   return 'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg);
 }
-function posterFor(x){return x.p||generatedPoster(x);}
+function isRealPoster(url){return /^https?:\/\//i.test(String(url||''))}
+function posterFor(x){return isRealPoster(x.p)?x.p:'';}
 const VECTOR_DIMS=['funny','light','relaxing','healing','romantic','exciting','tense','thought_provoking','scary','fast','slow','romantic_rel','friendship','family','sweet','gentle','realistic','bittersweet','dark','playful','warm','niche','no_character_death','happy_ending','family_safe','no_gore','no_jump_scares'];
 function itemVector(x){
   const s=new Set([...arr(x.em),...arr(x.pa),...arr(x.re),...arr(x.to),...arr(x.cf)]);
@@ -365,9 +366,9 @@ function card(x,i){
   const tags=[...arr(x.g).slice(0,2),...arr(x.to).slice(0,2),...arr(x.cf).slice(0,2)].map(v=>`<span>${esc(labels[v]||v)}</span>`).join('');
   const rn=arr(x.rn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
   const sn=arr(x.sn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
-  const fallback=generatedPoster(x), poster=posterFor(x);
+  const poster=posterFor(x);
   const proof=state.profile.requiredFacts.length?`<p class="rec-proof"><b>剧情边界</b>${state.profile.requiredFacts.map(f=>esc(labels[f]||f)).join(' · ')} <span>✓</span></p>`:'';
-  return `<article class="rec-card"><img class="rec-poster" src="${esc(poster)}" data-fallback="${esc(fallback)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.onerror=null;this.src=this.dataset.fallback"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}${platformText?`<span class="platform-pill">${esc(platformText)}</span>`:''}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(x.backendWhy||reason(x))}</p>${proof}${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><p class="rec-source">召回：Hard Gate + 稀疏召回 + Scene Vector + Semantic / RRF</p><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button><button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏'}</button></div></article>`;
+  return `<article class="rec-card"><img class="rec-poster" src="${esc(poster)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.classList.add('poster-broken');this.alt='海报加载失败'"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}${platformText?`<span class="platform-pill">${esc(platformText)}</span>`:''}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(x.backendWhy||reason(x))}</p>${proof}${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><p class="rec-source">召回：Hard Gate + 稀疏召回 + Scene Vector + Semantic / RRF</p><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button><button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏'}</button></div></article>`;
 }
 function socialDiscovery(items){
   if(!items.length)return '';
@@ -436,8 +437,7 @@ function openDetail(id){
   const surprises=arr(x.sn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
   const facts=[...factSet(x)].map(v=>labels[v]||v);
   const platforms=arr(x.pl).map(v=>labels[v]||v);
-  const fallback=generatedPoster(x);
-  $('#detail-body').innerHTML=`<div class="detail"><img src="${esc(posterFor(x))}" data-fallback="${esc(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${esc(x.t)} 海报"><div><small>${esc([x.y,labels[x.ct],(x.rt||x.ert)?(x.rt||x.ert)+' 分钟':null].filter(Boolean).join(' · '))}</small><h2>${esc(x.t)}</h2><p>${esc(x.d||'暂无简介')}</p><p><strong>平台快照：</strong>${platforms.length?esc(platforms.join(' / ')):'未验证；指定平台时不会把未知当作可用'}</p><p><strong>类型：</strong>${arr(x.g).map(esc).join(' / ')||'未标注'}</p><p><strong>氛围：</strong>${arr(x.to).map(v=>esc(labels[v]||v)).join(' / ')||'暂无'}</p>${facts.length?`<p><strong>结构化剧情事实：</strong>${esc(facts.join(' / '))}</p>`:'<p><strong>结构化剧情事实：</strong>当前证据不足，不把“未知”当成“没有”。</p>'}${risks.length?`<p><strong>可能雷点：</strong>${esc(risks.slice(0,5).join(' / '))}</p>`:'<p><strong>可能雷点：</strong>证据不足，不等于确定没有雷点。</p>'}${surprises.length?`<p><strong>无剧透看点：</strong>${esc(surprises.slice(0,5).join(' / '))}</p>`:''}<button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏到我的片单'}</button><p><small>内容理解置信度：${Math.round((x.uc||0)*100)}% · 数据层：${esc(x.src||'curated / public metadata')}</small></p></div></div>`;
+  $('#detail-body').innerHTML=`<div class="detail"><img src="${esc(posterFor(x))}" onerror="this.classList.add('poster-broken');this.alt='海报加载失败'" alt="${esc(x.t)} 海报"><div><small>${esc([x.y,labels[x.ct],(x.rt||x.ert)?(x.rt||x.ert)+' 分钟':null].filter(Boolean).join(' · '))}</small><h2>${esc(x.t)}</h2><p>${esc(x.d||'暂无简介')}</p><p><strong>平台快照：</strong>${platforms.length?esc(platforms.join(' / ')):'未验证；指定平台时不会把未知当作可用'}</p><p><strong>类型：</strong>${arr(x.g).map(esc).join(' / ')||'未标注'}</p><p><strong>氛围：</strong>${arr(x.to).map(v=>esc(labels[v]||v)).join(' / ')||'暂无'}</p>${facts.length?`<p><strong>结构化剧情事实：</strong>${esc(facts.join(' / '))}</p>`:'<p><strong>结构化剧情事实：</strong>当前证据不足，不把“未知”当成“没有”。</p>'}${risks.length?`<p><strong>可能雷点：</strong>${esc(risks.slice(0,5).join(' / '))}</p>`:'<p><strong>可能雷点：</strong>证据不足，不等于确定没有雷点。</p>'}${surprises.length?`<p><strong>无剧透看点：</strong>${esc(surprises.slice(0,5).join(' / '))}</p>`:''}<button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏到我的片单'}</button><p><small>内容理解置信度：${Math.round((x.uc||0)*100)}% · 数据层：${esc(x.src||'curated / public metadata')}</small></p></div></div>`;
   $('#detail-dialog').showModal();
 }
 function reset(){state.profile=freshProfile();state.seen.clear();state.lastQuery='';state.backendSession=null;$('#messages').innerHTML='';$('#conversation').classList.add('hidden');$('#welcome').classList.remove('hidden');$('#active-profile').classList.add('hidden');$('#quick-actions').classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'})}
@@ -511,24 +511,25 @@ async function loadLiveCatalog(){
     const inf=inferLive(s);
     const country=s.network?.country?.name||s.webChannel?.country?.name||'';
     const type=(s.type==='Reality'||s.type==='Game Show'||s.type==='Talk Show')?'variety':(arr(s.genres).includes('Animation')?'animation':'series');
-    const sourcePlatform=normalizePlatform(s.webChannel?.name||s.network?.name||''); const item={id:'tvmaze-live:'+s.id,t:s.name,ot:s.name,ct:type,y:Number((s.premiered||'').slice(0,4))||null,co:country?[country]:[],g:arr(s.genres),d:stripHtml(s.summary).slice(0,420),ert:s.averageRuntime||s.runtime||null,p:s.image?.original||s.image?.medium||'',ra:s.rating?.average??null,sc:type==='variety'?['friends','party']:['solo'],...inf,pb:(s.weight||0)>85?'high':(s.weight||0)>45?'medium':'low',uc:.62,cf:[],pl:sourcePlatform?[sourcePlatform]:[]}; item.p=item.p||generatedPoster(item); return item;
+    const sourcePlatform=normalizePlatform(s.webChannel?.name||s.network?.name||''); const item={id:'tvmaze-live:'+s.id,t:s.name,ot:s.name,ct:type,y:Number((s.premiered||'').slice(0,4))||null,co:country?[country]:[],g:arr(s.genres),d:stripHtml(s.summary).slice(0,420),ert:s.averageRuntime||s.runtime||null,p:s.image?.original||s.image?.medium||'',ra:s.rating?.average??null,sc:type==='variety'?['friends','party']:['solo'],...inf,pb:(s.weight||0)>85?'high':(s.weight||0)>45?'medium':'low',uc:.62,cf:[],pl:sourcePlatform?[sourcePlatform]:[]}; return item;
   });
-  const byId=new Map(FALLBACK_ITEMS.map(x=>[x.id,{...x,p:posterFor(x),pl:arr(x.pl)}])); for(const x of mapped)if(!byId.has(x.id))byId.set(x.id,x);
-  const items=[...byId.values()].map(x=>({...x,p:posterFor(x),pl:arr(x.pl)}));
+  const byId=new Map(FALLBACK_ITEMS.filter(x=>isRealPoster(x.p)).map(x=>[x.id,{...x,pl:arr(x.pl)}])); for(const x of mapped.filter(x=>isRealPoster(x.p)))if(!byId.has(x.id))byId.set(x.id,x);
+  const items=[...byId.values()].map(x=>({...x,pl:arr(x.pl)}));
   if(items.length<150)throw new Error('live catalog too small');
   return {version:'live-tvmaze-plus-curated',count:items.length,full_catalog_count:3339,items};
 }
 async function loadCatalog(){
   try{return await loadLiveCatalog();}
-  catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.map(x=>({...x,p:posterFor(x),pl:arr(x.pl)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
+  catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.filter(x=>isRealPoster(x.p)).map(x=>({...x,pl:arr(x.pl)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
 }
 async function init(){
   loadAccount();renderCommunity();renderDiscover();
+  const aiReady=await initBackend();
   try{
     const data=await loadCatalog();
     state.catalog=data.items||[];
     renderCollection();
-    $('#catalog-status').innerHTML=`<i></i>${state.catalog.length.toLocaleString()} 部内容 · 海报覆盖校验 · 多通道召回`;
+    $('#catalog-status').innerHTML=aiReady?`<i></i>GPT-5.6 Terra Agent · ${state.catalog.length.toLocaleString()} 部预览内容`:`<i></i>Pages 预览 · ${state.catalog.length.toLocaleString()} 部真实海报内容`;
     $('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');
   }catch(e){console.error(e);toast('片库加载失败，请刷新页面')}
 }
