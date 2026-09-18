@@ -1,7 +1,7 @@
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const labels={solo:'自己看',family:'和家人',friends:'和朋友',couple:'和对象',weekend:'周末',party:'聚会',late_night:'睡前',meal:'饭后',light:'轻松',relaxing:'放松',healing:'治愈',funny:'好笑',exciting:'刺激',tense:'紧张',thought_provoking:'烧脑',romantic:'恋爱感',movie:'电影',series:'电视剧',variety:'综艺',animation:'动漫',documentary:'纪录片',low:'低负担',high:'高信息量',Romance:'恋爱/爱情',Comedy:'喜剧',Thriller:'悬疑',Mystery:'推理',Action:'动作',Horror:'恐怖',niche:'小众优先',mainstream:'热门优先',sweet:'偏甜',gentle:'温柔',realistic:'现实',bittersweet:'苦甜',dark:'偏暗黑',playful:'轻快',warm:'温暖',precise:'精准匹配',balanced:'适度探索',explore:'探索模式',no_character_death:'没有角色死亡',happy_ending:'明确偏圆满',no_animal_harm:'无动物伤害',no_infidelity:'无出轨主线',no_gore:'无血腥重点',no_jump_scares:'无跳吓重点',no_sexual_content:'无明显大尺度',family_safe:'家庭共看友好',closed_ending:'结局收束',romance_central:'恋爱主线',friendship_central:'友情主线',career_central:'事业成长',iqiyi:'爱奇艺',tencent_video:'腾讯视频',youku:'优酷',mango_tv:'芒果TV',netflix:'Netflix',disney_plus:'Disney+',max:'Max',prime_video:'Prime Video'};
-const starters=['我想看小众恋爱片','我想看没有任何人死去的电影，最好结局也圆满','我只看爱奇艺，想找2026年的国产剧','和朋友聚会，想看轻松好笑的电影','和爸妈一起看，不要尴尬也不要大尺度','像《功夫》一样好笑，但不要太暴力','悬疑一点，但不要恐怖，也别有跳吓','给我一部我平时不会主动搜到、但很适合今晚的片'];
+const starters=['我只看爱奇艺，想找2026年的国产剧','今晚一个人看，想轻松一点但不要太俗套','和朋友聚会，想看节奏快又好笑的电影','和爸妈一起看，想找轻松自然的国产片','像《功夫》一样有喜剧节奏，但换个题材','周末想看一部高信息量的悬疑片','最近想探索小众一点的华语电影','别给我列表，今晚直接替我选一部'];
 const state={catalog:[],profile:freshProfile(),seen:new Set(),busy:false,lastQuery:''};
 const STORAGE_PREFIX='ying:v1:';
 const account={user:null,watchlist:[]};
@@ -264,7 +264,7 @@ function render(items){
   }
   $('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">影</div><div><p class="agent-intro">${intro}</p>${body}</div></div>`);
   profileChips();
-  const qa=['换一批','只替我选一个','不要有人死','结局要圆满','不要跳吓','更小众一点','给我点惊喜'];
+  const qa=['换一批','只替我选一个','更轻松一点','更小众一点','更新一点','给我点惊喜'];
   $('#quick-actions').innerHTML=qa.map(x=>`<button type="button" data-prompt="${x}">${x}</button>`).join('');
   $('#quick-actions').classList.remove('hidden');scrollEnd();
 }
