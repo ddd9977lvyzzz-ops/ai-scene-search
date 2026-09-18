@@ -69,7 +69,8 @@ class LLMAgentBrain:
         default_base="https://ai-gateway.vercel.sh/v1" if self.use_vercel_gateway else ""
         self.base_url=os.getenv("OPENAI_BASE_URL",default_base).strip() or None
         self.enabled_flag=os.getenv("OPENAI_AGENT_ENABLED","1").strip().lower() in {"1","true","yes"}
-        self.required=os.getenv("OPENAI_AGENT_REQUIRED","0").strip().lower() in {"1","true","yes"}
+        required_default="1" if os.getenv("VERCEL") else "0"
+        self.required=os.getenv("OPENAI_AGENT_REQUIRED",required_default).strip().lower() in {"1","true","yes"}
         self._client=None
 
     @property
