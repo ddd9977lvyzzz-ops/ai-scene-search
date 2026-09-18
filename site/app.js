@@ -3,6 +3,42 @@ const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const labels={solo:'自己看',family:'和家人',friends:'和朋友',couple:'和对象',weekend:'周末',party:'聚会',late_night:'睡前',meal:'饭后',light:'轻松',relaxing:'放松',healing:'治愈',funny:'好笑',exciting:'刺激',tense:'紧张',thought_provoking:'烧脑',romantic:'恋爱感',movie:'电影',series:'电视剧',variety:'综艺',animation:'动漫',documentary:'纪录片',low:'低负担',high:'高信息量',Romance:'恋爱/爱情',Comedy:'喜剧',Thriller:'悬疑',Mystery:'推理',Action:'动作',Horror:'恐怖',niche:'小众优先',mainstream:'热门优先',sweet:'偏甜',gentle:'温柔',realistic:'现实',bittersweet:'苦甜',dark:'偏暗黑',playful:'轻快',warm:'温暖',precise:'精准匹配',balanced:'适度探索',explore:'探索模式',no_character_death:'没有角色死亡',happy_ending:'明确偏圆满',no_animal_harm:'无动物伤害',no_infidelity:'无出轨主线',no_gore:'无血腥重点',no_jump_scares:'无跳吓重点',no_sexual_content:'无明显大尺度',family_safe:'家庭共看友好',closed_ending:'结局收束',romance_central:'恋爱主线',friendship_central:'友情主线',career_central:'事业成长',iqiyi:'爱奇艺',tencent_video:'腾讯视频',youku:'优酷',mango_tv:'芒果TV',netflix:'Netflix',disney_plus:'Disney+',max:'Max',prime_video:'Prime Video'};
 const starters=['我想看小众恋爱片','我想看没有任何人死去的电影，最好结局也圆满','最近想自己追一部2026国产剧，节奏快一点','和朋友聚会，想看轻松好笑的电影','和爸妈一起看，不要尴尬也不要大尺度','像《功夫》一样好笑，但不要太暴力','悬疑一点，但不要恐怖，也别有跳吓','给我一部我平时不会主动搜到、但很适合今晚的片'];
 const state={catalog:[],profile:freshProfile(),seen:new Set(),busy:false,lastQuery:''};
+const STORAGE_PREFIX='ying:v1:';
+const account={user:null,watchlist:[]};
+const COMMUNITY_SCENES=[
+  {id:'parents-safe',title:'和爸妈看，不尴尬',desc:'避开明显大尺度、跳吓和尴尬桥段，优先轻松、家庭共看友好。',tags:['家庭共看','低尴尬','轻松'],prompt:'和爸妈一起看，轻松一点，不要尴尬也不要大尺度'},
+  {id:'zero-death',title:'今晚不要有人死',desc:'把“没有角色死亡”当成剧情事实硬条件；未知不会自动当安全。',tags:['没人死','低压力','硬边界'],prompt:'我想看没有任何人死去的电影，最好结局也圆满'},
+  {id:'weekday-90',title:'工作日 90 分钟以内',desc:'短时长、低认知负荷，适合下班后不想做复杂选择的时候。',tags:['≤90min','低负担','工作日'],prompt:'工作日晚上一个人看，90分钟以内，不想动脑'},
+  {id:'friends-laugh',title:'朋友聚会先把气氛带起来',desc:'优先笑点密度与可打断性，不把高压剧情当成“刺激=适合聚会”。',tags:['朋友','好笑','可打断'],prompt:'和朋友聚会，想看轻松好笑的电影'}
+];
+function storeGet(key,fallback){try{const v=localStorage.getItem(STORAGE_PREFIX+key);return v?JSON.parse(v):fallback}catch(e){return fallback}}
+function storeSet(key,value){try{localStorage.setItem(STORAGE_PREFIX+key,JSON.stringify(value))}catch(e){}}
+function accountKey(){return account.user&&account.user.email?'watchlist:'+account.user.email:'watchlist:guest'}
+function loadAccount(){account.user=storeGet('user',null);account.watchlist=storeGet(accountKey(),[]);syncAccountUI()}
+function syncAccountUI(){const b=$('#account-button');if(b)b.textContent=account.user&&account.user.name?account.user.name:'登录'}
+function isSaved(id){return account.watchlist.indexOf(id)>=0}
+function toggleSave(id){
+  if(!account.user){$('#auth-dialog').showModal();toast('先创建一个本地 Demo 账户，再保存片单');return}
+  account.watchlist=isSaved(id)?account.watchlist.filter(function(x){return x!==id}):account.watchlist.concat([id]);
+  storeSet(accountKey(),account.watchlist);renderCollection();toast(isSaved(id)?'已加入我的片单':'已取消收藏');
+  document.querySelectorAll('[data-save]').forEach(function(btn){if(btn.dataset.save===id){btn.classList.toggle('saved',isSaved(id));btn.textContent=isSaved(id)?'已收藏':'收藏'}});
+}
+function renderCollection(){
+  const body=$('#collection-body');if(!body)return;
+  const items=account.watchlist.map(function(id){return state.catalog.find(function(x){return x.id===id})}).filter(Boolean);
+  if(!items.length){body.innerHTML='<div class="collection-empty">还没有收藏。推荐卡片上的“收藏”会把作品放进这里。</div>';return}
+  body.innerHTML=items.map(function(x){
+    const platforms=arr(x.pl).map(function(p){return labels[p]||p}).join(' / ');
+    const meta=[x.y,labels[x.ct]||x.ct,platforms].filter(Boolean).join(' · ');
+    return '<article class="collection-item"><img src="'+esc(posterFor(x))+'" data-fallback="'+esc(generatedPoster(x))+'" onerror="this.onerror=null;this.src=this.dataset.fallback"><div><h4>'+esc(x.t)+'</h4><p>'+esc(meta)+'</p><div class="collection-actions"><button data-detail="'+esc(x.id)+'">查看</button><button data-save="'+esc(x.id)+'">移除</button></div></div></article>';
+  }).join('');
+}
+function renderCommunity(){
+  const body=$('#community-body');if(!body)return;
+  body.innerHTML=COMMUNITY_SCENES.map(function(s){
+    return '<article class="community-card"><span class="community-meta">场景方案 · Demo 社区</span><h3>'+esc(s.title)+'</h3><p>'+esc(s.desc)+'</p><div class="scene-tags">'+s.tags.map(function(t){return '<span>'+esc(t)+'</span>'}).join('')+'</div><button class="save-button" data-prompt="'+esc(s.prompt)+'">用这个场景找片</button></article>';
+  }).join('');
+}
 function freshProfile(){return {contentTypes:[],requiredGenres:[],avoidGenres:[],requiredSignals:[],avoidRisks:[],requiredFacts:[],avoidFacts:[],moods:[],relationship:[],tone:[],pace:[],companions:null,scene:null,cognitive:null,popularity:null,language:null,runtimeMax:null,yearMin:null,platform:null,explore:false,pickOne:false,sourceReference:null};}
 function toast(m){const n=$('#toast');n.textContent=m;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2200)}
 function arr(v){return Array.isArray(v)?v:[]}
