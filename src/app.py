@@ -29,6 +29,7 @@ else:
 events = EventStore(EVENT_DB)
 catalog = CatalogService(CATALOG_DB)
 agent = SceneSearchAgent(CatalogRetriever(CATALOG_DB), store, events)
+social = agent.retriever.social
 
 app = FastAPI(title='AI Scene Search Web Demo', version='1.0.0')
 app.add_middleware(
@@ -132,6 +133,16 @@ def content_detail(content_id: str):
     if not item:
         raise HTTPException(404, 'content_not_found')
     return item
+
+
+@app.get('/v1/content/{content_id:path}/social-context')
+def content_social_context(content_id: str, refresh: bool = False):
+    item = catalog.get(content_id)
+    if not item:
+        raise HTTPException(404, 'content_not_found')
+    if refresh:
+        return social.refresh(content_id, item['title'])
+    return social.context(content_id)
 
 
 @app.post('/v1/memory/retrieve')
