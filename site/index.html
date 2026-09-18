@@ -10,11 +10,10 @@
 <body data-build="2026-09-18-pages-v3">
   <header class="topbar">
     <a class="brand" href="./" aria-label="影首页"><span class="brand-mark">影</span><span>YING</span></a>
+    <nav class="main-nav" aria-label="主导航"><button class="nav-link active" data-view="agent" type="button">Agent</button><button class="nav-link" data-view="discover" type="button">发现</button><button class="nav-link" data-view="community" type="button">社区</button><button class="nav-link" data-view="library" type="button">片单</button></nav>
     <div class="top-actions">
       <span class="catalog-status" id="catalog-status"><i></i>正在加载在线内容库</span>
-      <button class="quiet-button" id="community-button" type="button">社区</button>
-      <button class="quiet-button" id="collection-button" type="button">收藏</button>
-      <button class="quiet-button account-button" id="account-button" type="button">登录</button>
+            <button class="quiet-button account-button" id="account-button" type="button">登录</button>
       <button class="quiet-button" id="new-chat" type="button">新对话</button>
     </div>
   </header>
@@ -22,20 +21,33 @@
     <section class="welcome" id="welcome">
       <p class="eyebrow">YING · SCENE DECISION AGENT</p>
       <h1>今晚，想看什么？</h1>
-      <p class="lede">不用先想片名，也不用只说“爱情 / 悬疑”。你可以直接说人类真正会在意的边界：<strong>不要有人死、别出轨、不要跳吓、和爸妈看别尴尬、今晚脑子不想转</strong>。Agent 会先确认“能不能看”，再判断“适不适合此刻”。</p><div class="capability-strip"><span>剧情事实约束</span><span>雷点硬过滤</span><span>场景向量</span><span>相似作品探索</span><span>近似失败解释</span></div>
+      <p class="lede">不用先想片名。直接告诉「影」你此刻的观看状态、同行者、平台、时长和内容偏好；Agent 会把自然语言拆成可执行条件，再结合内容理解、向量召回与证据进行决策。</p><div class="capability-strip"><span>剧情事实约束</span><span>雷点硬过滤</span><span>场景向量</span><span>相似作品探索</span><span>近似失败解释</span></div>
       <div class="starter-grid" id="starter-grid" aria-label="示例问题"></div>
     </section>
     <section class="conversation hidden" id="conversation" aria-live="polite"><div class="messages" id="messages"></div></section>
-    <section class="composer-dock">
+    <section class="site-view hidden" id="view-discover">
+      <div class="page-head"><p class="eyebrow">DISCOVER</p><h1>从场景开始发现</h1><p>不按“热播榜”浏览，而是从今天的时间、状态和同行者进入内容。</p></div>
+      <div class="feature-grid" id="discover-grid"></div>
+    </section>
+    <section class="site-view hidden" id="view-community">
+      <div class="page-head"><p class="eyebrow">SCENE COMMUNITY</p><h1>别人正在怎么选</h1><p>社区内容单位是 Scene Card：场景、边界、片单和理由，而不是泛影评。</p></div>
+      <div class="community-grid page-community" id="community-page-body"></div>
+    </section>
+    <section class="site-view hidden" id="view-library">
+      <div class="page-head"><p class="eyebrow">MY LIBRARY</p><h1>我的片单</h1><p>收藏、场景与后续偏好都会在这里沉淀；收藏只作为弱偏好，不会锁死推荐。</p></div>
+      <div class="collection-grid page-library" id="library-page-body"></div>
+    </section>
+
+    <section class="composer-dock" id="agent-composer">
       <div class="active-profile hidden" id="active-profile"></div>
       <form class="composer" id="composer">
-        <textarea id="message-input" rows="1" maxlength="1000" placeholder="例如：我想看没有任何人死去的电影，最好结局也圆满" aria-label="描述你的观看场景"></textarea>
+        <textarea id="message-input" rows="1" maxlength="1000" placeholder="例如：我只看爱奇艺，今晚想找一部轻松但不俗套的国产剧" aria-label="描述你的观看场景"></textarea>
         <button class="send" id="send" type="submit" aria-label="发送">发送</button>
       </form>
       <div class="quick-actions hidden" id="quick-actions"></div>
       <p class="footnote">Pages Demo：场景决策、收藏与本地账户可直接体验；实时社媒检索在生产后端通过官方 API / 合规 Web Search 接入。完整工程包含 3,339 条内容、RRF 多路召回、Evidence RAG 与会话存储。</p>
     </section>
-    <details class="system-note">
+    <details class="system-note" id="agent-system-note">
       <summary>数据与检索说明</summary>
       <div class="system-grid"><p id="data-note">在线 Demo：公开内容源 + 2026 国产精选 + 安全事实样本 · 完整工程：3,339 条内容</p><p>Hard Gate → 稀疏召回 → 场景向量 → RRF/排序 → Evidence</p></div>
     </details>
