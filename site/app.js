@@ -15,7 +15,7 @@ function storeGet(key,fallback){try{const v=localStorage.getItem(STORAGE_PREFIX+
 function storeSet(key,value){try{localStorage.setItem(STORAGE_PREFIX+key,JSON.stringify(value))}catch(e){}}
 function accountKey(){return account.user&&account.user.email?'watchlist:'+account.user.email:'watchlist:guest'}
 function loadAccount(){account.user=storeGet('user',null);account.watchlist=storeGet(accountKey(),[]);syncAccountUI()}
-function syncAccountUI(){const b=$('#account-button');if(b)b.textContent=account.user&&account.user.name?account.user.name:'登录'}
+function syncAccountUI(){const b=$('#account-button'),logout=$('#auth-logout');if(b)b.textContent=account.user&&account.user.name?account.user.name:'登录';if(logout)logout.classList.toggle('hidden',!account.user)}
 function isSaved(id){return account.watchlist.indexOf(id)>=0}
 function toggleSave(id){
   if(!account.user){$('#auth-dialog').showModal();toast('先创建一个本地 Demo 账户，再保存片单');return}
@@ -346,5 +346,47 @@ async function loadCatalog(){
   try{return await loadLiveCatalog();}
   catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.map(x=>({...x,p:posterFor(x),pl:arr(x.pl)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
 }
-async function init(){try{const data=await loadCatalog();state.catalog=data.items||[];$('#catalog-status').innerHTML=`<i></i>${state.catalog.length.toLocaleString()} 部内容 · 海报 100% · 多通道召回`;$('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');}catch(e){console.error(e);toast('片库加载失败，请刷新页面')}}
-document.addEventListener('click',e=>{const p=e.target.closest('[data-prompt]');if(p)sendMessage(p.dataset.prompt);const d=e.target.closest('[data-detail]');if(d)openDetail(d.dataset.detail)});$('#composer').addEventListener('submit',e=>{e.preventDefault();sendMessage($('#message-input').value)});$('#message-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(e.target.value)}});$('#new-chat').addEventListener('click',reset);$('#detail-close').addEventListener('click',()=>$('#detail-dialog').close());init();
+async function init(){
+  loadAccount();renderCommunity();
+  try{
+    const data=await loadCatalog();
+    state.catalog=data.items||[];
+    renderCollection();
+    $('#catalog-status').innerHTML=`<i></i>${state.catalog.length.toLocaleString()} 部内容 · 海报 100% · 多通道召回`;
+    $('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');
+  }catch(e){console.error(e);toast('片库加载失败，请刷新页面')}
+}
+document.addEventListener('click',e=>{
+  const p=e.target.closest('[data-prompt]');
+  if(p){
+    const community=$('#community-dialog');if(community&&community.open)community.close();
+    sendMessage(p.dataset.prompt);
+  }
+  const d=e.target.closest('[data-detail]');if(d)openDetail(d.dataset.detail);
+  const s=e.target.closest('[data-save]');if(s)toggleSave(s.dataset.save);
+});
+$('#composer').addEventListener('submit',e=>{e.preventDefault();sendMessage($('#message-input').value)});
+$('#message-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(e.target.value)}});
+$('#new-chat').addEventListener('click',reset);
+$('#detail-close').addEventListener('click',()=>$('#detail-dialog').close());
+$('#account-button').addEventListener('click',()=>{
+  if(account.user){$('#auth-name').value=account.user.name;$('#auth-email').value=account.user.email}
+  syncAccountUI();$('#auth-dialog').showModal();
+});
+$('#auth-close').addEventListener('click',()=>$('#auth-dialog').close());
+$('#collection-button').addEventListener('click',()=>{renderCollection();$('#collection-dialog').showModal()});
+$('#collection-close').addEventListener('click',()=>$('#collection-dialog').close());
+$('#community-button').addEventListener('click',()=>{renderCommunity();$('#community-dialog').showModal()});
+$('#community-close').addEventListener('click',()=>$('#community-dialog').close());
+$('#auth-form').addEventListener('submit',e=>{
+  e.preventDefault();
+  const name=$('#auth-name').value.trim(),email=$('#auth-email').value.trim().toLowerCase();
+  if(!name||!email)return;
+  account.user={name,email};storeSet('user',account.user);account.watchlist=storeGet(accountKey(),[]);
+  syncAccountUI();renderCollection();$('#auth-dialog').close();toast('本地 Demo 账户已登录');
+});
+$('#auth-logout').addEventListener('click',()=>{
+  storeSet('user',null);account.user=null;account.watchlist=[];syncAccountUI();renderCollection();
+  $('#auth-name').value='';$('#auth-email').value='';$('#auth-dialog').close();toast('已退出本地 Demo 账户');
+});
+init();
