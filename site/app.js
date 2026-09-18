@@ -147,6 +147,7 @@ function switchView(name){
   if(name==='discover')renderDiscover();
   if(name==='community')renderCommunity();
   if(name==='library')renderCollection();
+  if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
   window.scrollTo({top:0,behavior:'smooth'});
 }
 function freshProfile(){return {contentTypes:[],requiredGenres:[],avoidGenres:[],requiredSignals:[],avoidRisks:[],requiredFacts:[],avoidFacts:[],moods:[],relationship:[],tone:[],pace:[],companions:null,scene:null,cognitive:null,popularity:null,language:null,runtimeMax:null,yearMin:null,platform:null,explore:false,pickOne:false,sourceReference:null};}
@@ -536,6 +537,7 @@ async function init(){
     renderCollection();
     $('#catalog-status').innerHTML=aiReady?`<i></i>GPT-5.6 Terra Agent · ${state.catalog.length.toLocaleString()} 部预览内容`:`<i></i>Pages 预览 · ${state.catalog.length.toLocaleString()} 部真实海报内容`;
     $('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');
+    const initial=(location.hash||'#agent').slice(1);switchView(['agent','discover','community','library'].includes(initial)?initial:'agent');
   }catch(e){console.error(e);toast('片库加载失败，请刷新页面')}
 }
 document.addEventListener('click',e=>{
