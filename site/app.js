@@ -214,24 +214,39 @@ function startConversation(){$('#welcome').classList.add('hidden');$('#conversat
 function addUser(t){startConversation();$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-user"><p>${esc(t)}</p></div>`)}
 function card(x,i){
   const rt=x.rt||x.ert;
+  const platformText=arr(x.pl).map(p=>labels[p]||p).join(' / ');
   const meta=[x.y,rt?`${rt} 分钟`:null,labels[x.ct]||x.ct,x.pb==='low'?'偏冷门':x.pb==='high'?'较热门':null].filter(Boolean).join(' · ');
   const tags=[...arr(x.g).slice(0,2),...arr(x.to).slice(0,2),...arr(x.cf).slice(0,2)].map(v=>`<span>${esc(labels[v]||v)}</span>`).join('');
   const rn=arr(x.rn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
   const sn=arr(x.sn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
   const fallback=generatedPoster(x), poster=posterFor(x);
   const proof=state.profile.requiredFacts.length?`<p class="rec-proof"><b>剧情边界</b>${state.profile.requiredFacts.map(f=>esc(labels[f]||f)).join(' · ')} <span>✓</span></p>`:'';
-  return `<article class="rec-card"><img class="rec-poster" src="${esc(poster)}" data-fallback="${esc(fallback)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.onerror=null;this.src=this.dataset.fallback"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(reason(x))}</p>${proof}${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><p class="rec-source">召回：硬过滤 + 稀疏特征 + 场景向量 + 内容排序</p><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button></div></article>`;
+  return `<article class="rec-card"><img class="rec-poster" src="${esc(poster)}" data-fallback="${esc(fallback)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.onerror=null;this.src=this.dataset.fallback"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}${platformText?`<span class="platform-pill">${esc(platformText)}</span>`:''}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(reason(x))}</p>${proof}${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><p class="rec-source">召回：Hard Gate + 稀疏召回 + Scene Vector + Semantic / RRF</p><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button><button class="save-button ${isSaved(x.id)?'saved':''}" type="button" data-save="${esc(x.id)}">${isSaved(x.id)?'已收藏':'收藏'}</button></div></article>`;
+}
+function socialDiscovery(items){
+  if(!items.length)return '';
+  const focus=items[0];
+  const platform=state.profile.platform?labels[state.profile.platform]:null;
+  const sources=[
+    ['小红书','合规 Web Search','按片名 + 场景词检索公开索引内容；不直接绕过平台反爬。'],
+    ['公众号','合规 Web Search','检索被公开索引的文章与媒体内容，保留原始链接、作者和发布时间。'],
+    ['百度','AI Search API','负责中文全网检索、新闻时效与跨站结果；生产端通过服务端 API 调用。'],
+    ['X','Recent Search API','通过官方 Posts Search 读取公开讨论、时间和互动指标。']
+  ];
+  const rows=sources.map(s=>`<div class="social-source"><b>${esc(s[0])} · ${esc(s[1])}</b><p>${esc(s[2])}</p></div>`).join('');
+  const platformNote=platform?` 当前仍严格限定在 ${esc(platform)} 已验证可用的候选内。`:'';
+  return `<section class="social-discovery"><div class="social-discovery-head"><div><h4>猜你还想确认：《${esc(focus.t)}》在全网为什么被讨论？</h4><p class="social-sub">这里展示联网观点层的来源策略，不伪造实时帖子。生产版会把社媒讨论作为弱排序信号，并保留来源、时间、作者与可信度。${platformNote}</p></div><span class="social-badge">Social Evidence</span></div><div class="social-source-grid">${rows}</div></section>`;
 }
 function render(items){
-  const intro=items.length?'我先把你明确说出的剧情事实和风险边界锁成硬条件，再做召回和排序。向量只负责“像不像”，不能推翻“能不能”。':'这组条件没有足够确定的候选，我不会把“未知”冒充“安全”。下面列出最接近但没过线的原因。';
+  const intro=items.length?'我先锁住平台、剧情事实和风险边界，再做多路召回。社媒热度只影响合法候选内部的排序，不会把别的平台或踩雷内容推回来。':'这组条件没有足够确定的候选，我不会把“未知”冒充“满足”。下面给出最接近但没过线的原因。';
   let body='';
   if(items.length){
-    body=`<div class="recommend-list">${items.map(card).join('')}</div>`;
+    body=`<div class="recommend-list">${items.map(card).join('')}</div>${socialDiscovery(items)}`;
   }else{
     const misses=nearMisses();
-    body=`<div class="no-match"><p>没有找到同时满足全部硬条件的候选。</p>${misses.length?`<div class="near-miss"><b>最接近但被拦截</b>${misses.map(({x,fail})=>`<p>《${esc(x.t)}》：缺少/冲突 ${esc(fail.join('、'))}</p>`).join('')}</div>`:''}<p class="rec-source">这里的“未知”不会自动当成“没有”：例如没有死亡证据 ≠ 已确认没人死亡。</p></div>`;
+    body=`<div class="no-match"><p>没有找到同时满足全部硬条件的候选。</p>${misses.length?`<div class="near-miss"><b>最接近但被拦截</b>${misses.map(({x,fail})=>`<p>《${esc(x.t)}》：缺少/冲突 ${esc(fail.join('、'))}</p>`).join('')}</div>`:''}<p class="rec-source">“未知”不会自动当成“有”：平台可用性、死亡/出轨等剧情事实都需要正向证据。</p></div>`;
   }
-  $('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">此</div><div><p class="agent-intro">${intro}</p>${body}</div></div>`);
+  $('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">影</div><div><p class="agent-intro">${intro}</p>${body}</div></div>`);
   profileChips();
   const qa=['换一批','只替我选一个','不要有人死','结局要圆满','不要跳吓','更小众一点','给我点惊喜'];
   $('#quick-actions').innerHTML=qa.map(x=>`<button type="button" data-prompt="${x}">${x}</button>`).join('');
