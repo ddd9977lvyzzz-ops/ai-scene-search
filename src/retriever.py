@@ -56,6 +56,12 @@ class CatalogRetriever:
         self.con = sqlite3.connect(db_path, check_same_thread=False)
         self.con.row_factory = sqlite3.Row
         self.intelligence = ContentIntelligenceIndex(self.con)
+        self.verified_platforms = {}
+        try:
+            for row in self.con.execute("SELECT content_id,platform FROM platform_availability WHERE status='available' AND confidence>=0.75"):
+                self.verified_platforms.setdefault(row['content_id'], []).append(row['platform'])
+        except sqlite3.OperationalError:
+            pass
         self.vectors = {}
         try:
             for row in self.con.execute("SELECT content_id,vector_json FROM content_vectors"):
@@ -77,7 +83,7 @@ class CatalogRetriever:
             genres=_j(row["genres_json"]), description=row["overview"] or "",
             scene_tags=_j(row["scene_tags_json"]), emotion_tags=_j(row["emotion_tags_json"]),
             watching_tags=_j(row["watching_tags_json"]), risk_tags=_j(row["risk_tags_json"]),
-            cognitive_load=row["cognitive_load"], platforms=_j(row["origin_platforms_json"]), poster_url=row["poster_url"],
+            cognitive_load=row["cognitive_load"], platforms=self.verified_platforms.get(row["content_id"], []), poster_url=row["poster_url"],
             audience_tags=_j(row["audience_tags_json"]), pace_tags=_j(row["pace_tags_json"]),
             relationship_tags=_j(row["relationship_tags_json"]), theme_tags=_j(row["theme_tags_json"]),
             tone_tags=intel.get('tone_tags', []), surprise_tags=intel.get('surprise_tags', []),
