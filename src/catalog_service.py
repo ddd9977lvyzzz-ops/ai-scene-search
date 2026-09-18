@@ -75,7 +75,7 @@ class CatalogService:
         except Exception: evidence=0
         platform_rows=int(self.con.execute("SELECT COUNT(*) FROM content WHERE origin_platforms_json IS NOT NULL AND origin_platforms_json<>'[]'").fetchone()[0])
         movie_total=int(self.con.execute("SELECT COUNT(*) FROM content WHERE content_type='movie'").fetchone()[0])
-        movie_genre=int(self.con.execute("SELECT COUNT(*) FROM content WHERE content_type='movie' AND lower(genres_json) NOT IN ('["film"]','[]')").fetchone()[0])
+        movie_genre=int(self.con.execute("""SELECT COUNT(*) FROM content WHERE content_type='movie' AND lower(genres_json) NOT IN ('["film"]','[]')""").fetchone()[0])
         meta={}
         try: meta={r[0]:r[1] for r in self.con.execute('SELECT key,value FROM catalog_meta').fetchall()}
         except Exception: pass
