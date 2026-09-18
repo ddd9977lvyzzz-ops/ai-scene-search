@@ -1,6 +1,6 @@
-# 此刻看什么 · AI 场景化影视决策 Agent
+# 影（YING）· 场景化影视决策 Agent
 
-一个以“当前观看场景”为核心，而不是只做片名搜索的影视推荐 Agent。
+一个完整的 AI Native 影视决策网站：场景 Agent、发现、社区、账户、收藏片单、平台可用性、Social Evidence 与可解释推荐。
 
 用户可以直接说：“我想看小众恋爱片”“和朋友聚会，想看轻松好笑的电影”“一个人睡前看，想治愈一点，不要太虐”“悬疑一点，但不要恐怖”“像《功夫》一样好笑的电影”。
 
@@ -8,18 +8,19 @@
 
 ## 当前两套运行形态
 
-### 1. GitHub Pages 在线作品集版
+### 1. GitHub Pages 在线预览版
 
 https://ddd9977lvyzzz-ops.github.io/ai-scene-search/
 
-这个版本是无后端、零密钥的可交互 Demo：
+这个版本用于 UI / 召回逻辑预览。由于浏览器端不能安全保存模型密钥，Pages 不冒充完整 LLM Agent；完整 Agent 模式由 FastAPI 服务端调用模型 API：
 
 - 内置一组经过人工校准的国产剧与代表性电影，保证关键 Case 不因外部 API 失败而失效。
 - 浏览器启动后会尝试从 TVMaze 公共 API 拉取约 1000 条实时剧集内容，并转成 Scene / Emotion / Pace / Risk / Relationship 特征。
-- Hard Gate、场景重排和“给我点惊喜”直接在浏览器执行。
-- 外部数据请求失败时自动退回 curated fallback，不会白屏。
+- Hard Gate、场景重排和探索控制可以在浏览器降级执行。
+- 若通过 `?api=https://YOUR_BACKEND` 指向已部署 FastAPI，Pages 会切到服务端 Agent 会话。
+- 页面标签可逐个删除，并与服务端 Session Profile 同步。
 
-Pages 版的目的，是让面试官或评审打开链接就能体验产品逻辑。它不是生产数据库替代品。
+Pages 版是静态预览，不是完整生产运行形态。完整运行形态必须包含服务端模型 API、canonical catalog、账号/片单数据库和联网证据服务。
 
 ### 2. 完整 FastAPI / RAG 工程版
 
@@ -30,7 +31,7 @@ Pages 版的目的，是让面试官或评审打开链接就能体验产品逻�
 - Structured Features + 128 维 multilingual LSA semantic retrieval
 - Hybrid Recall + Hard Constraint Filter + Feature / Scene / Semantic Rerank
 - Content Intelligence + spoiler-safe Evidence RAG
-- 可选 OpenAI Structured Intent Enrichment
+- OpenAI Responses API Agent Brain（生产模式要求服务端 `OPENAI_API_KEY`；默认 GPT-5.6 Terra）
 - SQLite 主数据 + 可选 Redis Session
 - Docker / Render 配置
 - 18 / 18 automated tests
@@ -95,8 +96,9 @@ Romance 是 Hard Constraint，而不是弱 embedding 特征。任何不满足 Ro
 
 ## 文档
 
-- docs/PRD.md：完整产品边界、Feature Schema、召回排序、RAG、调试指标
-- docs/ARCHITECTURE.md：存储、向量、Redis、确定性与探索边界
+- `docs/PRD_V1.3_PRODUCT_GTM.md`：用户、角色、场景、社区、商业化、GTM、增长与指标
+- `docs/RETRIEVAL_V2.md`：多路召回、Scene Vector、RRF、Hard Gate
+- `docs/ARCHITECTURE.md`：存储、向量、Redis、确定性与探索边界
 
 ## Repository
 
@@ -112,7 +114,7 @@ https://github.com/ddd9977lvyzzz-ops/ai-scene-search
 - **Multi-channel recall**：结构化召回、稀疏特征、128d semantic index、可解释 scene vector、reference-title channel 分开，再由 RRF / reranker 融合。
 - **Near-miss explanation**：0 结果时展示最接近的候选为什么被硬条件拦截，而不是悄悄放宽条件。
 - **Decision Mode**：支持“别给列表，直接替我选一个”。
-- **Poster quality gate**：完整数据管道要求 poster coverage = 100%；源站海报缺失时生成稳定 SVG fallback，并显式标记为 generated poster。
+- **Real Poster quality gate**：canonical catalog 要求 100% 真实 HTTP 海报；TVMaze 主海报优先，缺失项通过 TMDB `poster_path` 联网回填；生成 SVG 不再进入数据库，未补齐时 strict build 直接失败。
 - **2026 国产精选层**：加入《惊蛰无声》《镖人：风起大漠》《飞驰人生3》《星河入梦》《熊猫计划之部落奇遇记》《熊出没·年年有熊》《群星闪耀时》《家业》《一瓯春》《深渊无间》等条目。
 
 完整产品定义见：
