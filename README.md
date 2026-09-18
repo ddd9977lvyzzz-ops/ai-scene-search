@@ -168,7 +168,7 @@ Production sets:
 ```text
 OPENAI_AGENT_ENABLED=1
 OPENAI_AGENT_REQUIRED=1
-OPENAI_AGENT_MODEL=gpt-6-astra
+OPENAI_AGENT_MODEL=gpt-5.6-terra
 OPENAI_API_KEY=<server-side secret>
 ```
 
