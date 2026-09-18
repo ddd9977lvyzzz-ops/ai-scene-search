@@ -1,9 +1,9 @@
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const labels={solo:'自己看',family:'和家人',friends:'和朋友',couple:'和对象',weekend:'周末',party:'聚会',late_night:'睡前',meal:'饭后',light:'轻松',relaxing:'放松',healing:'治愈',funny:'好笑',exciting:'刺激',tense:'紧张',thought_provoking:'烧脑',romantic:'恋爱感',movie:'电影',series:'电视剧',variety:'综艺',animation:'动漫',documentary:'纪录片',low:'低负担',high:'高信息量',Romance:'恋爱/爱情',Comedy:'喜剧',Thriller:'悬疑',Mystery:'推理',Action:'动作',Horror:'恐怖',niche:'小众优先',mainstream:'热门优先',sweet:'偏甜',gentle:'温柔',realistic:'现实',bittersweet:'苦甜',dark:'偏暗黑',playful:'轻快',warm:'温暖',precise:'精准匹配',balanced:'适度探索',explore:'探索模式'};
-const starters=['我想看小众恋爱片','最近想自己追一部国产剧，节奏快一点，不要太虐','和朋友聚会，想看轻松好笑的电影','一个人睡前看，想治愈一点，90分钟内','像《功夫》一样好笑的电影','悬疑一点，但不要恐怖'];
+const labels={solo:'自己看',family:'和家人',friends:'和朋友',couple:'和对象',weekend:'周末',party:'聚会',late_night:'睡前',meal:'饭后',light:'轻松',relaxing:'放松',healing:'治愈',funny:'好笑',exciting:'刺激',tense:'紧张',thought_provoking:'烧脑',romantic:'恋爱感',movie:'电影',series:'电视剧',variety:'综艺',animation:'动漫',documentary:'纪录片',low:'低负担',high:'高信息量',Romance:'恋爱/爱情',Comedy:'喜剧',Thriller:'悬疑',Mystery:'推理',Action:'动作',Horror:'恐怖',niche:'小众优先',mainstream:'热门优先',sweet:'偏甜',gentle:'温柔',realistic:'现实',bittersweet:'苦甜',dark:'偏暗黑',playful:'轻快',warm:'温暖',precise:'精准匹配',balanced:'适度探索',explore:'探索模式',no_character_death:'没有角色死亡',happy_ending:'明确偏圆满',no_animal_harm:'无动物伤害',no_infidelity:'无出轨主线',no_gore:'无血腥重点',no_jump_scares:'无跳吓重点',no_sexual_content:'无明显大尺度',family_safe:'家庭共看友好',closed_ending:'结局收束',romance_central:'恋爱主线',friendship_central:'友情主线',career_central:'事业成长'};
+const starters=['我想看小众恋爱片','我想看没有任何人死去的电影，最好结局也圆满','最近想自己追一部2026国产剧，节奏快一点','和朋友聚会，想看轻松好笑的电影','和爸妈一起看，不要尴尬也不要大尺度','像《功夫》一样好笑，但不要太暴力','悬疑一点，但不要恐怖，也别有跳吓','给我一部我平时不会主动搜到、但很适合今晚的片'];
 const state={catalog:[],profile:freshProfile(),seen:new Set(),busy:false,lastQuery:''};
-function freshProfile(){return {contentTypes:[],requiredGenres:[],avoidGenres:[],requiredSignals:[],avoidRisks:[],moods:[],relationship:[],tone:[],pace:[],companions:null,scene:null,cognitive:null,popularity:null,language:null,runtimeMax:null,explore:false,sourceReference:null};}
+function freshProfile(){return {contentTypes:[],requiredGenres:[],avoidGenres:[],requiredSignals:[],avoidRisks:[],requiredFacts:[],avoidFacts:[],moods:[],relationship:[],tone:[],pace:[],companions:null,scene:null,cognitive:null,popularity:null,language:null,runtimeMax:null,yearMin:null,explore:false,sourceReference:null};}
 function toast(m){const n=$('#toast');n.textContent=m;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2200)}
 function arr(v){return Array.isArray(v)?v:[]}
 function lower(v){return String(v||'').toLowerCase()}
@@ -11,22 +11,59 @@ function hasGenre(x,g){return arr(x.g).some(v=>lower(v).includes(lower(g))) || (
 function hasAny(x,keys,field){const vals=arr(x[field]);return keys.some(k=>vals.includes(k));}
 function mergeUnique(a,b){return [...new Set([...a,...b])];}
 function removeMood(conflicts){state.profile.moods=state.profile.moods.filter(x=>!conflicts.includes(x));}
+function factSet(x){return new Set(arr(x.cf).concat(Object.entries(x.facts||{}).filter(([,v])=>v===true).map(([k])=>k)));}
+function hasFact(x,f){return factSet(x).has(f);}
+function generatedPoster(x){
+  const seed=hash((x.id||'')+(x.t||'')); const h1=seed%360, h2=(h1+42+(seed%70))%360;
+  const title=String(x.t||'此刻看什么').slice(0,14), year=x.y||'';
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${h1} 35% 18%)"/><stop offset="1" stop-color="hsl(${h2} 48% 44%)"/></linearGradient></defs><rect width="600" height="900" rx="28" fill="url(#g)"/><circle cx="485" cy="155" r="130" fill="white" opacity=".08"/><circle cx="80" cy="760" r="180" fill="white" opacity=".06"/><text x="52" y="650" fill="white" font-family="system-ui, sans-serif" font-size="25" opacity=".72">SCENE • ${year}</text><foreignObject x="48" y="680" width="510" height="160"><div xmlns="http://www.w3.org/1999/xhtml" style="font:700 58px/1.15 system-ui;color:white;letter-spacing:-2px;word-break:break-all">${esc(title)}</div></foreignObject><text x="52" y="850" fill="white" font-family="system-ui, sans-serif" font-size="18" opacity=".62">AI SCENE SEARCH · DEMO POSTER</text></svg>`;
+  return 'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg);
+}
+function posterFor(x){return x.p||generatedPoster(x);}
+const VECTOR_DIMS=['funny','light','relaxing','healing','romantic','exciting','tense','thought_provoking','scary','fast','slow','romantic_rel','friendship','family','sweet','gentle','realistic','bittersweet','dark','playful','warm','niche','no_character_death','happy_ending','family_safe','no_gore','no_jump_scares'];
+function itemVector(x){
+  const s=new Set([...arr(x.em),...arr(x.pa),...arr(x.re),...arr(x.to),...arr(x.cf)]);
+  if(x.pb==='low')s.add('niche');
+  if(hasGenre(x,'Comedy'))s.add('funny');
+  if(hasGenre(x,'Romance'))s.add('romantic_rel');
+  return VECTOR_DIMS.map(d=>s.has(d)?1:0);
+}
+function queryVector(p){
+  const s=new Set([...p.moods,...p.pace,...p.relationship,...p.tone,...p.requiredFacts]);
+  if(p.popularity==='niche')s.add('niche');
+  if(p.requiredSignals.includes('funny'))s.add('funny');
+  if(p.requiredSignals.includes('fast'))s.add('fast');
+  if(p.requiredGenres.includes('Romance'))s.add('romantic_rel');
+  return VECTOR_DIMS.map(d=>s.has(d)?1:0);
+}
+function cosine(a,b){let dot=0,aa=0,bb=0;for(let i=0;i<a.length;i++){dot+=a[i]*b[i];aa+=a[i]*a[i];bb+=b[i]*b[i];}return aa&&bb?dot/Math.sqrt(aa*bb):0;}
+function vectorScore(x){return cosine(queryVector(state.profile),itemVector(x));}
 function parse(text){
   const p=state.profile; const q=text.trim(); state.lastQuery=q;
   if(/换一批|再来一批|换几个/.test(q)) return;
   if(/都可以|电影剧集都可以|不限/.test(q)) p.contentTypes=[];
-  if(/给我点惊喜|惊喜一点|探索/.test(q)) p.explore=true;
-  if(/电影|(?:恋爱|爱情|纯爱).{0,2}片/.test(q)) p.contentTypes=['movie']; else if(/电视剧|剧集|追一部.*剧|想看.*剧|恋爱剧|爱情剧|甜宠剧|小甜剧/.test(q)) p.contentTypes=['series'];
+  if(/给我点惊喜|惊喜一点|探索|不会主动搜|意外一点/.test(q)) p.explore=true;
+  if(/电影/.test(q)) p.contentTypes=['movie']; else if(/电视剧|剧集|追一部.*剧|想看.*剧|恋爱剧|爱情剧|甜宠剧|小甜剧/.test(q)) p.contentTypes=['series'];
   if(/国产|中国大陆|中文/.test(q)) p.language='Chinese';
+  const y=q.match(/(20\d{2})/); if(y)p.yearMin=Number(y[1]);
   if(/恋爱|爱情|纯爱|甜宠/.test(q)){p.requiredGenres=mergeUnique(p.requiredGenres,['Romance']);p.relationship=mergeUnique(p.relationship,['romantic']);}
-  if(/喜剧|好笑|搞笑|逗/.test(q)){p.requiredSignals=mergeUnique(p.requiredSignals,['funny']);}
-  if(/节奏快|快节奏|紧凑/.test(q)){p.requiredSignals=mergeUnique(p.requiredSignals,['fast']);p.pace=mergeUnique(p.pace,['fast']);}
+  if(/喜剧|好笑|搞笑|逗|想笑/.test(q)){p.requiredSignals=mergeUnique(p.requiredSignals,['funny']);}
+  if(/节奏快|快节奏|紧凑|不拖沓/.test(q)){p.requiredSignals=mergeUnique(p.requiredSignals,['fast']);p.pace=mergeUnique(p.pace,['fast']);}
   if(/悬疑|推理/.test(q)) p.requiredGenres=mergeUnique(p.requiredGenres,[/推理/.test(q)?'Mystery':'Thriller']);
   if(/动作/.test(q)) p.requiredGenres=mergeUnique(p.requiredGenres,['Action']);
   if(/科幻/.test(q)) p.requiredGenres=mergeUnique(p.requiredGenres,['Sci-Fi']);
   if(/不要.*恐怖|别.*恐怖|不想.*恐怖/.test(q)){p.avoidGenres=mergeUnique(p.avoidGenres,['Horror']);p.avoidRisks=mergeUnique(p.avoidRisks,['fear_or_horror']);}
   if(/不要.*爱情|别.*恋爱|不想.*恋爱/.test(q)) p.avoidGenres=mergeUnique(p.avoidGenres,['Romance']);
-  if(/不要太虐|别太虐|不虐/.test(q)) p.avoidRisks=mergeUnique(p.avoidRisks,['emotionally_heavy']);
+  if(/不要太虐|别太虐|不虐|别太沉重/.test(q)) p.avoidRisks=mergeUnique(p.avoidRisks,['emotionally_heavy']);
+  if(/不要太暴力|别太暴力|不要暴力/.test(q)) p.avoidRisks=mergeUnique(p.avoidRisks,['violence_possible']);
+  if(/不要尴尬|别尴尬|不尴尬/.test(q)) p.avoidRisks=mergeUnique(p.avoidRisks,['social_embarrassment']);
+  if(/不要大尺度|别有亲密戏|不想看亲密戏/.test(q)) p.requiredFacts=mergeUnique(p.requiredFacts,['no_sexual_content']);
+  if(/不要跳吓|别有跳吓|没有跳吓/.test(q)) p.requiredFacts=mergeUnique(p.requiredFacts,['no_jump_scares']);
+  if(/不要血腥|不血腥|没有血腥/.test(q)) p.requiredFacts=mergeUnique(p.requiredFacts,['no_gore']);
+  if(/没有.*人死|没有任何人死|没人死|不要有人死|不死人|不能死人/.test(q)) p.requiredFacts=mergeUnique(p.requiredFacts,['no_character_death']);
+  if(/结局.*圆满|圆满结局|happy ending|HE\b|大团圆/i.test(q)) p.requiredFacts=mergeUnique(p.requiredFacts,['happy_ending']);
+  if(/不要出轨|没有出轨|无出轨/.test(q)) p.requiredFacts=mergeUnique(p.requiredFacts,['no_infidelity']);
+  if(/不要伤害动物|动物不要死|没有动物伤害/.test(q)) p.requiredFacts=mergeUnique(p.requiredFacts,['no_animal_harm']);
   if(/和朋友|朋友聚会|朋友看/.test(q)){p.companions='friends';p.scene='party';}
   if(/和家人|跟家人|爸妈|父母/.test(q)){p.companions='family';p.scene=/饭后|吃饭/.test(q)?'meal':p.scene;}
   if(/和对象|跟对象|约会|情侣/.test(q)) p.companions='couple';
@@ -34,12 +71,14 @@ function parse(text){
   if(/睡前|躺床|晚上睡/.test(q)) p.scene='late_night';
   if(/饭后|吃饭/.test(q)) p.scene='meal';
   if(/周末/.test(q)) p.scene=p.scene||'weekend';
-  if(/小众|冷门|宝藏/.test(q)) p.popularity='niche';
+  if(/小众|冷门|宝藏|不会主动搜/.test(q)) p.popularity='niche';
   if(/热门|大众/.test(q)) p.popularity='mainstream';
   if(/治愈/.test(q)){removeMood(['exciting','tense','thought_provoking']);p.moods=mergeUnique(p.moods,['healing','relaxing']);p.cognitive='low';}
   if(/轻松|放松|下饭|不想动脑/.test(q)){removeMood(['exciting','tense','thought_provoking']);p.moods=mergeUnique(p.moods,['light','relaxing']);p.cognitive='low';}
   if(/刺激/.test(q)){removeMood(['light','relaxing']);p.moods=mergeUnique(p.moods,['exciting']);}
   if(/烧脑/.test(q)) p.moods=mergeUnique(p.moods,['thought_provoking']);
+  if(/现实一点|写实|成年人恋爱/.test(q)) p.tone=mergeUnique(p.tone,['realistic']);
+  if(/甜一点|偏甜/.test(q)) p.tone=mergeUnique(p.tone,['sweet']);
   const m=q.match(/(?:两小时|2小时)/); if(m) p.runtimeMax=120;
   const mins=q.match(/(\d{2,3})\s*分钟/); if(mins) p.runtimeMax=Number(mins[1]);
   const ref=q.match(/《([^》]{1,30})》/); if(ref) p.sourceReference=ref[1].trim();
@@ -66,11 +105,14 @@ function renderClarify(item){
 }
 function hardOk(x){const p=state.profile;
   if(p.contentTypes.length&&!p.contentTypes.includes(x.ct))return false;
+  if(p.yearMin&&(!x.y||Number(x.y)<p.yearMin))return false;
   if(p.runtimeMax&&(!x.rt&& !x.ert || Number(x.rt||x.ert)>p.runtimeMax))return false;
   if(p.language==='Chinese'&&!arr(x.co).some(c=>String(c).includes('中国大陆'))&&!['中文','Chinese','Mandarin','Cantonese'].includes(x.la))return false;
   if(p.requiredGenres.some(g=>!hasGenre(x,g)))return false;
   if(p.avoidGenres.some(g=>hasGenre(x,g)))return false;
   if(p.avoidRisks.some(r=>arr(x.ri).includes(r)))return false;
+  if(p.requiredFacts.some(f=>!hasFact(x,f)))return false;
+  if(p.avoidFacts.some(f=>hasFact(x,f)))return false;
   if(p.requiredSignals.includes('funny')&&!(hasGenre(x,'Comedy')||arr(x.em).includes('funny')||arr(x.to).includes('playful')))return false;
   if(p.requiredSignals.includes('fast')&&!(arr(x.pa).includes('fast')||arr(x.em).includes('exciting')||['Action','Thriller','Adventure'].some(g=>hasGenre(x,g))))return false;
   return true;
@@ -91,6 +133,8 @@ function score(x){const p=state.profile;let s=0;
   if(p.requiredSignals.includes('funny'))s+=hasGenre(x,'Comedy')?2.1:1;
   if(p.requiredSignals.includes('fast'))s+=arr(x.pa).includes('fast')?1.7:.6;
   s+=anchorScore(x)*2.2;
+  s+=vectorScore(x)*2.4;
+  if(p.requiredFacts.length)s+=2.6*overlap(p.requiredFacts,[...factSet(x)]);
   if(x.ra!=null)s+=Math.max(0,(Number(x.ra)-6)/4)*.45;
   if(x.uc!=null)s+=Number(x.uc)*.25;
   if(p.explore){s+=(arr(x.g).length*.03)+(x.pb==='low'?.5:0)+((hash(x.id)%100)/100)*.35;}
@@ -107,16 +151,35 @@ function reason(x){const p=state.profile;const bits=[];
   if(p.popularity==='niche'&&['low','medium'].includes(x.pb))bits.push('热度更偏小众');
   if(p.scene&&arr(x.sc).includes(p.scene))bits.push(`适配${labels[p.scene]||p.scene}场景`);
   if(p.moods.length&&overlap(p.moods,arr(x.em))>0)bits.push('情绪氛围匹配');
+  if(p.requiredFacts.length&&p.requiredFacts.every(f=>hasFact(x,f)))bits.push('剧情事实边界已命中');
+  if(vectorScore(x)>.25)bits.push('场景特征向量相似度较高');
   if(p.sourceReference&&anchorScore(x)>.15)bits.push(`与《${p.sourceReference}》在类型/氛围上有相似点`);
   return bits.slice(0,3).join('；')||'在当前合法候选里，综合类型、场景和内容理解得分靠前。';}
-function profileChips(){const p=state.profile;const raw=[p.companions,p.scene,...p.moods,p.cognitive,...p.contentTypes,...p.requiredGenres,...p.relationship,...p.pace].filter(Boolean);let vals=raw.map(x=>labels[x]||x);if(p.language)vals.push('中文/国产');if(p.sourceReference)vals.push(`类似《${p.sourceReference}》`);if(p.popularity)vals.push(labels[p.popularity]);if(p.runtimeMax)vals.push(`≤ ${p.runtimeMax} 分钟`);if(p.explore)vals.push('探索模式');p.avoidGenres.forEach(x=>vals.push(`不要 ${labels[x]||x}`));p.avoidRisks.forEach(x=>vals.push(x==='emotionally_heavy'?'不要太虐':x==='fear_or_horror'?'不要惊吓':`避开 ${x}`));const n=$('#active-profile');n.innerHTML=[...new Set(vals)].map(x=>`<span>${esc(x)}</span>`).join('');n.classList.toggle('hidden',!vals.length)}
+function profileChips(){const p=state.profile;const raw=[p.companions,p.scene,...p.moods,p.cognitive,...p.contentTypes,...p.requiredGenres,...p.relationship,...p.pace].filter(Boolean);let vals=raw.map(x=>labels[x]||x);if(p.language)vals.push('中文/国产');if(p.sourceReference)vals.push(`类似《${p.sourceReference}》`);if(p.popularity)vals.push(labels[p.popularity]);if(p.runtimeMax)vals.push(`≤ ${p.runtimeMax} 分钟`);if(p.yearMin)vals.push(`${p.yearMin}+`);p.requiredFacts.forEach(x=>vals.push(labels[x]||x));if(p.explore)vals.push('探索模式');p.avoidGenres.forEach(x=>vals.push(`不要 ${labels[x]||x}`));p.avoidRisks.forEach(x=>vals.push(x==='emotionally_heavy'?'不要太虐':x==='fear_or_horror'?'不要惊吓':`避开 ${x}`));const n=$('#active-profile');n.innerHTML=[...new Set(vals)].map(x=>`<span>${esc(x)}</span>`).join('');n.classList.toggle('hidden',!vals.length)}
 function startConversation(){$('#welcome').classList.add('hidden');$('#conversation').classList.remove('hidden')}
 function addUser(t){startConversation();$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-user"><p>${esc(t)}</p></div>`)}
-function card(x,i){const rt=x.rt||x.ert;const meta=[x.y,rt?`${rt} 分钟`:null,labels[x.ct]||x.ct,x.pb==='low'?'偏冷门':x.pb==='high'?'较热门':null].filter(Boolean).join(' · ');const tags=[...arr(x.g).slice(0,2),...arr(x.to).slice(0,2)].map(v=>`<span>${esc(labels[v]||v)}</span>`).join('');const rn=arr(x.rn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);const sn=arr(x.sn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);return `<article class="rec-card"><img class="rec-poster" src="${esc(x.p)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.style.visibility='hidden'"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(reason(x))}</p>${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button></div></article>`}
-function render(items){const intro=items.length?'我先锁住你明确说出的类型、时长、平台/风险边界，再用场景和内容特征排序。探索只发生在满足硬条件的候选里。':'这组硬条件下暂时没有足够可靠的结果，可以放宽一个条件再试。';$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">此</div><div><p class="agent-intro">${intro}</p>${items.length?`<div class="recommend-list">${items.map(card).join('')}</div>`:'<div class="no-match"><p>没有找到满足全部硬条件的候选。</p></div>'}</div></div>`);profileChips();const qa=['换一批','更轻松一点','更小众一点','给我点惊喜'];$('#quick-actions').innerHTML=qa.map(x=>`<button type="button" data-prompt="${x}">${x}</button>`).join('');$('#quick-actions').classList.remove('hidden');scrollEnd()}
+function card(x,i){
+  const rt=x.rt||x.ert;
+  const meta=[x.y,rt?`${rt} 分钟`:null,labels[x.ct]||x.ct,x.pb==='low'?'偏冷门':x.pb==='high'?'较热门':null].filter(Boolean).join(' · ');
+  const tags=[...arr(x.g).slice(0,2),...arr(x.to).slice(0,2),...arr(x.cf).slice(0,2)].map(v=>`<span>${esc(labels[v]||v)}</span>`).join('');
+  const rn=arr(x.rn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
+  const sn=arr(x.sn).slice(0,2).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
+  const fallback=generatedPoster(x), poster=posterFor(x);
+  const proof=state.profile.requiredFacts.length?`<p class="rec-proof"><b>剧情边界</b>${state.profile.requiredFacts.map(f=>esc(labels[f]||f)).join(' · ')} <span>✓</span></p>`:'';
+  return `<article class="rec-card"><img class="rec-poster" src="${esc(poster)}" data-fallback="${esc(fallback)}" alt="${esc(x.t)} 海报" loading="lazy" onerror="this.onerror=null;this.src=this.dataset.fallback"><div class="rec-copy"><div class="rec-top"><div><h3 class="rec-title">${i+1}. ${esc(x.t)}</h3><p class="rec-meta">${esc(meta)}</p></div><span class="rec-score">${Math.round(Math.min(99,72+score(x)*3))} 匹配</span></div><p class="rec-why">${esc(reason(x))}</p>${proof}${rn.length?`<p class="rec-insight"><b>可能雷点</b>${esc(rn.join(' · '))}</p>`:''}${sn.length?`<p class="rec-insight"><b>无剧透看点</b>${esc(sn.join(' · '))}</p>`:''}<div class="rec-tags">${tags}</div><p class="rec-source">召回：硬过滤 + 稀疏特征 + 场景向量 + 内容排序</p><button class="rec-more" type="button" data-detail="${esc(x.id)}">查看内容依据</button></div></article>`;
+}
+function render(items){const intro=items.length?'我先锁住你明确说出的类型、时长、平台/风险边界，再用场景和内容特征排序。探索只发生在满足硬条件的候选里。':'这组硬条件下暂时没有足够可靠的结果，可以放宽一个条件再试。';$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">此</div><div><p class="agent-intro">${intro}</p>${items.length?`<div class="recommend-list">${items.map(card).join('')}</div>`:'<div class="no-match"><p>没有找到满足全部硬条件的候选。</p></div>'}</div></div>`);profileChips();const qa=['换一批','不要有人死','结局要圆满','更轻松一点','更小众一点','给我点惊喜'];$('#quick-actions').innerHTML=qa.map(x=>`<button type="button" data-prompt="${x}">${x}</button>`).join('');$('#quick-actions').classList.remove('hidden');scrollEnd()}
 function scrollEnd(){requestAnimationFrame(()=>window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}))}
 async function sendMessage(text){text=(text||'').trim();if(!text||state.busy)return;state.busy=true;$('#send').disabled=true;addUser(text);$('#message-input').value='';parse(text);const clarify=nextClarification();if(clarify){renderClarify(clarify);}else{render(recommend());}state.busy=false;$('#send').disabled=false;}
-function openDetail(id){const x=state.catalog.find(v=>v.id===id);if(!x)return;const risks=arr(x.rn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);const surprises=arr(x.sn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);$('#detail-body').innerHTML=`<div class="detail"><img src="${esc(x.p)}" alt="${esc(x.t)} 海报"><div><small>${esc([x.y,labels[x.ct],(x.rt||x.ert)?(x.rt||x.ert)+' 分钟':null].filter(Boolean).join(' · '))}</small><h2>${esc(x.t)}</h2><p>${esc(x.d||'暂无简介')}</p><p><strong>类型：</strong>${arr(x.g).map(esc).join(' / ')||'未标注'}</p><p><strong>氛围：</strong>${arr(x.to).map(v=>esc(labels[v]||v)).join(' / ')||'暂无'}</p>${risks.length?`<p><strong>可能雷点：</strong>${esc(risks.slice(0,5).join(' / '))}</p>`:'<p><strong>可能雷点：</strong>证据不足，不等于确定没有雷点。</p>'}${surprises.length?`<p><strong>无剧透看点：</strong>${esc(surprises.slice(0,5).join(' / '))}</p>`:''}<small>内容理解置信度：${Math.round((x.uc||0)*100)}% · 来源：${esc(x.src||'catalog')}</small></div></div>`;$('#detail-dialog').showModal()}
+function openDetail(id){
+  const x=state.catalog.find(v=>v.id===id);if(!x)return;
+  const risks=arr(x.rn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
+  const surprises=arr(x.sn).map(v=>typeof v==='string'?v:(v.text||v.note||v.label||v.tag)).filter(Boolean);
+  const facts=[...factSet(x)].map(v=>labels[v]||v);
+  const fallback=generatedPoster(x);
+  $('#detail-body').innerHTML=`<div class="detail"><img src="${esc(posterFor(x))}" data-fallback="${esc(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${esc(x.t)} 海报"><div><small>${esc([x.y,labels[x.ct],(x.rt||x.ert)?(x.rt||x.ert)+' 分钟':null].filter(Boolean).join(' · '))}</small><h2>${esc(x.t)}</h2><p>${esc(x.d||'暂无简介')}</p><p><strong>类型：</strong>${arr(x.g).map(esc).join(' / ')||'未标注'}</p><p><strong>氛围：</strong>${arr(x.to).map(v=>esc(labels[v]||v)).join(' / ')||'暂无'}</p>${facts.length?`<p><strong>结构化剧情事实：</strong>${esc(facts.join(' / '))}</p>`:'<p><strong>结构化剧情事实：</strong>当前证据不足，不把“未知”当成“没有”。</p>'}${risks.length?`<p><strong>可能雷点：</strong>${esc(risks.slice(0,5).join(' / '))}</p>`:'<p><strong>可能雷点：</strong>证据不足，不等于确定没有雷点。</p>'}${surprises.length?`<p><strong>无剧透看点：</strong>${esc(surprises.slice(0,5).join(' / '))}</p>`:''}<small>内容理解置信度：${Math.round((x.uc||0)*100)}% · 数据层：${esc(x.src||'curated / public metadata')} · Poster: ${x.p?'source / fallback-on-error':'generated fallback'}</small></div></div>`;
+  $('#detail-dialog').showModal();
+}
 function reset(){state.profile=freshProfile();state.seen.clear();state.lastQuery='';$('#messages').innerHTML='';$('#conversation').classList.add('hidden');$('#welcome').classList.remove('hidden');$('#active-profile').classList.add('hidden');$('#quick-actions').classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'})}
 const FALLBACK_ITEMS=[
 {id:"seed:ljx",t:"临江仙",ct:"series",y:2025,co:["中国大陆"],g:["Drama","Romance"],d:"相爱相杀的仙侠关系线，重点在误解、共同经历与关系修复。",ert:45,p:"https://static.tvmaze.com/uploads/images/original_untouched/571/1429084.jpg",sc:["solo"],em:["romantic"],cl:"medium",pa:["moderate"],ri:["romance_theme"],re:["romantic"],to:["romantic"],pb:"low",uc:.82},
@@ -144,6 +207,22 @@ const FALLBACK_ITEMS=[
 {id:"seed:kickass",t:"特攻聯盟",ct:"movie",y:2010,co:["United States","United Kingdom"],g:["Action","Comedy","Crime"],d:"普通人模仿超级英雄引发失控冲突，喜剧与高强度暴力并存。",rt:117,p:"https://commons.wikimedia.org/wiki/Special:FilePath/Kick-ass.svg",sc:["friends"],em:["funny","exciting"],cl:"low",pa:["fast","lively"],ri:["violence_possible","mature_rating"],to:["playful","dark"],pb:"medium",uc:.72},
 {id:"seed:childrenmen",t:"人類之子",ct:"movie",y:2006,co:["United Kingdom","United States"],g:["Drama","Science-Fiction","Thriller"],d:"在全球失去生育能力的近未来社会，一次护送任务牵动政治与人道危机。",rt:109,p:"https://commons.wikimedia.org/wiki/Special:FilePath/Children%20of%20Men%20Baby.JPG",sc:["solo"],em:["tense","thought_provoking"],cl:"high",pa:["fast"],ri:["violence_possible","emotionally_heavy"],to:["dark"],pb:"medium",uc:.78},
 {id:"seed:caligari",t:"卡里加里博士的小屋",ct:"movie",y:1920,co:["Germany"],g:["Horror","Mystery","Thriller"],d:"德国表现主义经典，视觉、心理不安与不可靠叙事是主要体验。",rt:77,p:"https://commons.wikimedia.org/wiki/Special:FilePath/Das%20Cabinet%20des%20Dr.%20Caligari.JPG",sc:["solo"],em:["scary","tense"],cl:"high",pa:["moderate"],ri:["fear_or_horror"],to:["dark"],pb:"low",uc:.78}
+
+,{id:"cn26:jingzhe",t:"惊蛰无声",ct:"movie",y:2026,co:["中国大陆"],g:["Thriller","Crime","Action"],d:"国安小组围绕重要情报外泄展开调查，在无声较量中追查风险源。",rt:115,p:"",sc:["solo","friends"],em:["tense","exciting"],cl:"high",pa:["fast"],ri:["violence_possible"],re:["team"],to:["realistic","dark"],cf:["closed_ending"],rn:["涉及谍战、追查与潜在暴力情境"],sn:["现实题材的高压调查感"],pb:"high",uc:.72,src:"国家电影局 2026 春节档片单"}
+,{id:"cn26:biaoren",t:"镖人：风起大漠",ct:"movie",y:2026,co:["中国大陆"],g:["Action","Adventure","Drama"],d:"大漠镖客受托护送神秘人物前往长安，途中遭遇围剿与宿命牵连。",rt:125,p:"",sc:["friends","weekend"],em:["exciting","tense"],cl:"medium",pa:["fast"],ri:["violence_possible"],to:["dark"],cf:[],rn:["武侠动作与围剿场面较多"],sn:["大漠武侠、公路护送与群像关系"],pb:"high",uc:.72,src:"国家电影局 2026 春节档片单"}
+,{id:"cn26:feichi3",t:"飞驰人生3",ct:"movie",y:2026,co:["中国大陆"],g:["Comedy","Drama","Sport"],d:"最后一届巴音布鲁克拉力赛落幕后，赛车手回到现实并面对新的生活与竞技挑战。",rt:120,p:"",sc:["friends","family","weekend"],em:["funny","light","exciting"],cl:"low",pa:["fast","lively"],ri:[],to:["playful","warm"],cf:["no_gore","no_jump_scares"],rn:["赛车运动存在紧张和事故风险"],sn:["赛车喜剧与现实生活的反差"],pb:"high",uc:.7,src:"国家电影局 2026 春节档片单"}
+,{id:"cn26:xinghe",t:"星河入梦",ct:"movie",y:2026,co:["中国大陆"],g:["Science-Fiction","Adventure","Comedy"],d:"近未来虚拟梦境系统“良梦”中，管理员与舰长穿梦闯关，展开脑洞型冒险。",rt:118,p:"",sc:["friends","weekend"],em:["exciting","funny","thought_provoking"],cl:"medium",pa:["fast"],ri:[],to:["playful","stylized"],cf:["no_gore"],rn:["包含虚拟梦境危机场景"],sn:["梦境世界与现实规则之间的设定玩法"],pb:"high",uc:.72,src:"国家电影局 2026 春节档片单"}
+,{id:"cn26:panda",t:"熊猫计划之部落奇遇记",ct:"movie",y:2026,co:["中国大陆"],g:["Comedy","Adventure","Family"],d:"熊猫胡胡与国际巨星意外进入神奇部落，在冒险中帮助部落解决难题。",rt:100,p:"",sc:["family","friends"],em:["funny","light","relaxing"],cl:"low",pa:["lively"],ri:[],to:["playful","warm"],cf:["family_safe","no_gore","no_jump_scares"],rn:["家庭向冒险中的轻度危机"],sn:["真人与熊猫的错位组合"],pb:"high",uc:.68,src:"国家电影局 2026 春节档片单"}
+,{id:"cn26:boonie",t:"熊出没·年年有熊",ct:"movie",y:2026,co:["中国大陆"],g:["Animation","Comedy","Family","Adventure"],d:"不速之客引发危机后，熊大、熊二和光头强再次合作化解问题。",rt:99,p:"",sc:["family"],em:["funny","light","relaxing"],cl:"low",pa:["lively"],ri:[],to:["playful","warm"],cf:["family_safe","no_gore"],rn:["动画冒险中有轻度危机"],sn:["熟人角色组合与合家欢冒险"],pb:"high",uc:.7,src:"国家电影局 2026 春节档片单"}
+,{id:"cn26:qunxing",t:"群星闪耀时",ct:"movie",y:2026,co:["中国大陆"],g:["Science-Fiction","Adventure","Drama"],d:"航天员在太空遭遇险情，并收到来自过去的神秘电子信号，需要破译信号援救未来。",rt:125,p:"",sc:["friends","solo"],em:["tense","exciting","thought_provoking"],cl:"high",pa:["fast"],ri:["violence_possible"],to:["realistic"],cf:[],rn:["太空险情与生存压力"],sn:["跨时间信号与航天救援"],pb:"medium",uc:.7,src:"国家电影局 2026 暑期档片单"}
+,{id:"cn26:jiaye",t:"家业",ct:"series",y:2026,co:["中国大陆"],g:["Drama","History","Romance"],d:"明朝徽州贡墨案后，李祯以制墨天赋重振家业，并与骆文谦从竞争走向合作。",ert:45,p:"",ra:8.8,sc:["solo","family"],em:["romantic","thought_provoking"],cl:"medium",pa:["moderate"],ri:["emotionally_heavy"],re:["romantic","family"],to:["realistic","warm"],cf:["happy_ending","closed_ending","career_central","romance_central"],rn:["家族兴衰、竞争和阶段性死亡/离别议题"],sn:["非遗制墨、女性事业成长与合作型关系"],pb:"high",uc:.88,src:"爱奇艺 2026 正片页"}
+,{id:"safe:intern",t:"实习生",ct:"movie",y:2015,co:["United States"],g:["Comedy","Drama"],d:"退休老人进入互联网创业公司成为高龄实习生，在代际相处中重新找到生活节奏。",rt:121,p:"",sc:["solo","family"],em:["funny","light","relaxing","healing"],cl:"low",pa:["moderate"],ri:[],re:["friendship","workplace"],to:["warm","gentle"],cf:["no_character_death","no_animal_harm","no_gore","no_jump_scares","family_safe","closed_ending"],rn:["存在婚姻关系压力，但不是暴力或惊吓型内容"],sn:["代际友谊和职场陪伴感"],pb:"medium",uc:.76,src:"demo curated content-facts"}
+,{id:"safe:chef",t:"落魄大厨",ct:"movie",y:2014,co:["United States"],g:["Comedy","Drama"],d:"厨师离开受挫的餐厅工作后开起餐车，与家人和朋友重新建立连接。",rt:114,p:"",sc:["solo","family","friends"],em:["funny","light","relaxing","healing"],cl:"low",pa:["lively"],ri:[],re:["family","friendship"],to:["warm","playful"],cf:["no_character_death","happy_ending","no_gore","no_jump_scares","closed_ending"],rn:["少量成人语言"],sn:["美食、公路与亲子关系的修复"],pb:"medium",uc:.78,src:"demo curated content-facts"}
+,{id:"safe:legally",t:"律政俏佳人",ct:"movie",y:2001,co:["United States"],g:["Comedy","Romance"],d:"女主因感情挫折进入法学院，逐步把外界偏见转化成自我证明。",rt:96,p:"",sc:["solo","friends"],em:["funny","light","relaxing"],cl:"low",pa:["lively"],ri:[],re:["romantic","friendship"],to:["playful","warm"],cf:["no_character_death","happy_ending","no_gore","no_jump_scares","closed_ending"],rn:["有情感分手和轻度成人话题"],sn:["从恋爱动机转向自我成长"],pb:"medium",uc:.78,src:"demo curated content-facts"}
+,{id:"safe:schoolrock",t:"摇滚校园",ct:"movie",y:2003,co:["United States"],g:["Comedy","Music","Family"],d:"失意乐手冒充代课老师，把一群孩子组织成摇滚乐队。",rt:109,p:"",sc:["family","friends"],em:["funny","light","relaxing"],cl:"low",pa:["lively"],ri:[],re:["friendship"],to:["playful","warm"],cf:["no_character_death","no_gore","no_jump_scares","family_safe","closed_ending"],rn:["有撒谎与学校规则冲突"],sn:["音乐排练、群体协作与舞台释放"],pb:"medium",uc:.78,src:"demo curated content-facts"}
+,{id:"safe:paddington2",t:"帕丁顿熊2",ct:"movie",y:2017,co:["United Kingdom"],g:["Comedy","Family","Adventure"],d:"帕丁顿为了买礼物努力打工，却被卷入误会，需要家人与朋友帮忙找出真相。",rt:103,p:"",sc:["family","friends"],em:["funny","light","relaxing","healing"],cl:"low",pa:["lively"],ri:[],re:["family","friendship"],to:["warm","playful"],cf:["no_character_death","happy_ending","no_gore","no_jump_scares","family_safe","closed_ending"],rn:["包含轻度追逐、误会和监狱情节"],sn:["极高善意密度和群像回馈"],pb:"medium",uc:.82,src:"demo curated content-facts"}
+,{id:"safe:kiki",t:"魔女宅急便",ct:"movie",y:1989,co:["Japan"],g:["Animation","Family","Fantasy"],d:"年轻魔女离家修行，在海边城市经营送货服务并度过自我怀疑期。",rt:103,p:"",sc:["solo","family"],em:["light","relaxing","healing"],cl:"low",pa:["moderate"],ri:[],re:["friendship"],to:["gentle","warm"],cf:["no_character_death","no_gore","no_jump_scares","family_safe","closed_ending"],rn:["后段有短暂高空救援危机"],sn:["成长焦虑被处理得非常轻盈"],pb:"medium",uc:.82,src:"demo curated content-facts"}
+,{id:"safe:yearmeeting",t:"年会不能停！",ct:"movie",y:2023,co:["中国大陆"],g:["Comedy","Drama"],d:"普通工人阴差阳错进入集团总部，在荒诞职场流程中一路被误认为管理人才。",rt:117,p:"",sc:["friends","solo"],em:["funny","light"],cl:"low",pa:["lively"],ri:[],re:["workplace","friendship"],to:["playful","realistic"],cf:["no_character_death","no_gore","no_jump_scares","closed_ending"],rn:["职场裁员、权力压迫和高强度社畜共鸣"],sn:["流程荒诞和组织语言错位"],pb:"high",uc:.76,src:"demo curated content-facts"}
 ];
 
 function stripHtml(s){const d=document.createElement('div');d.innerHTML=String(s||'');return (d.textContent||'').replace(/\s+/g,' ').trim();}
@@ -168,16 +247,16 @@ async function loadLiveCatalog(){
     const inf=inferLive(s);
     const country=s.network?.country?.name||s.webChannel?.country?.name||'';
     const type=(s.type==='Reality'||s.type==='Game Show'||s.type==='Talk Show')?'variety':(arr(s.genres).includes('Animation')?'animation':'series');
-    return {id:'tvmaze-live:'+s.id,t:s.name,ot:s.name,ct:type,y:Number((s.premiered||'').slice(0,4))||null,co:country?[country]:[],g:arr(s.genres),d:stripHtml(s.summary).slice(0,420),ert:s.averageRuntime||s.runtime||null,p:s.image?.original||s.image?.medium||'',ra:s.rating?.average??null,sc:type==='variety'?['friends','party']:['solo'],...inf,pb:(s.weight||0)>85?'high':(s.weight||0)>45?'medium':'low',uc:.62};
+    const item={id:'tvmaze-live:'+s.id,t:s.name,ot:s.name,ct:type,y:Number((s.premiered||'').slice(0,4))||null,co:country?[country]:[],g:arr(s.genres),d:stripHtml(s.summary).slice(0,420),ert:s.averageRuntime||s.runtime||null,p:s.image?.original||s.image?.medium||'',ra:s.rating?.average??null,sc:type==='variety'?['friends','party']:['solo'],...inf,pb:(s.weight||0)>85?'high':(s.weight||0)>45?'medium':'low',uc:.62,cf:[]}; item.p=item.p||generatedPoster(item); return item;
   });
-  const byId=new Map(FALLBACK_ITEMS.map(x=>[x.id,x])); for(const x of mapped)if(!byId.has(x.id))byId.set(x.id,x);
-  const items=[...byId.values()];
+  const byId=new Map(FALLBACK_ITEMS.map(x=>[x.id,{...x,p:posterFor(x)}])); for(const x of mapped)if(!byId.has(x.id))byId.set(x.id,x);
+  const items=[...byId.values()].map(x=>({...x,p:posterFor(x)}));
   if(items.length<150)throw new Error('live catalog too small');
   return {version:'live-tvmaze-plus-curated',count:items.length,full_catalog_count:3339,items};
 }
 async function loadCatalog(){
   try{return await loadLiveCatalog();}
-  catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);return {version:'curated-fallback',count:FALLBACK_ITEMS.length,full_catalog_count:3339,items:FALLBACK_ITEMS};}
+  catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.map(x=>({...x,p:posterFor(x)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
 }
 async function init(){try{const data=await loadCatalog();state.catalog=data.items||[];$('#catalog-status').innerHTML=`<i></i>${state.catalog.length.toLocaleString()} 部真实内容 · 浏览器本地检索`;$('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');}catch(e){console.error(e);toast('片库加载失败，请刷新页面')}}
 document.addEventListener('click',e=>{const p=e.target.closest('[data-prompt]');if(p)sendMessage(p.dataset.prompt);const d=e.target.closest('[data-detail]');if(d)openDetail(d.dataset.detail)});$('#composer').addEventListener('submit',e=>{e.preventDefault();sendMessage($('#message-input').value)});$('#message-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(e.target.value)}});$('#new-chat').addEventListener('click',reset);$('#detail-close').addEventListener('click',()=>$('#detail-dialog').close());init();
