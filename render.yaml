@@ -20,7 +20,7 @@ services:
       - key: OPENAI_AGENT_REQUIRED
         value: '1'
       - key: OPENAI_AGENT_MODEL
-        value: gpt-5.6-luna
+        value: gpt-5.6-terra
       - key: OPENAI_API_KEY
         sync: false
       - key: TMDB_API_TOKEN
