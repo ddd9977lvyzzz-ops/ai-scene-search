@@ -80,7 +80,7 @@ function parse(text){
   if(/都可以|电影剧集都可以|不限/.test(q)) p.contentTypes=[];
   if(/给我点惊喜|惊喜一点|探索|不会主动搜|意外一点/.test(q)) p.explore=true;
   if(/只给我一个|直接选一个|替我选一个|帮我拍板|别给列表/.test(q)) p.pickOne=true;
-  if(/电影/.test(q)) p.contentTypes=['movie']; else if(/电视剧|剧集|追一部.*剧|想看.*剧|恋爱剧|爱情剧|甜宠剧|小甜剧/.test(q)) p.contentTypes=['series'];
+  if(/电影/.test(q)) p.contentTypes=['movie']; else if(/电视剧|剧集|国产剧|国剧|追一部.*剧|想看.*剧|恋爱剧|爱情剧|甜宠剧|小甜剧/.test(q)) p.contentTypes=['series'];
   if(/国产|中国大陆|中文/.test(q)) p.language='Chinese';
   if(/爱奇艺|iQIYI/i.test(q)) p.platform='iqiyi';
   else if(/腾讯视频|WeTV/i.test(q)) p.platform='tencent_video';
@@ -142,7 +142,7 @@ function nextClarification(){
 }
 function renderClarify(item){
   startConversation();
-  $('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">此</div><div><p class="agent-intro">${esc(item.question)}</p><div class="clarify-options">${item.options.map(x=>`<button type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('')}</div></div></div>`);
+  $('#messages').insertAdjacentHTML('beforeend',`<div class="turn-agent"><div class="agent-avatar">影</div><div><p class="agent-intro">${esc(item.question)}</p><div class="clarify-options">${item.options.map(x=>`<button type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('')}</div></div></div>`);
   profileChips();
   $('#quick-actions').classList.add('hidden');
   scrollEnd();
