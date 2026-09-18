@@ -55,10 +55,13 @@ class SceneProfile:
             if value not in (None, ''):
                 setattr(self, name, value)
 
+        if patch.platforms:
+            self.platforms = list(dict.fromkeys(patch.platforms))
+
         list_fields = [
             'moods', 'content_types', 'genres', 'required_genres',
             'relationship_focus', 'required_signals', 'audience_preferences', 'tone_preferences', 'pace_preferences',
-            'surprise_preferences', 'avoid_genres', 'avoid_risks', 'required_facts', 'avoid_facts', 'platforms',
+            'surprise_preferences', 'avoid_genres', 'avoid_risks', 'required_facts', 'avoid_facts',
         ]
         for name in list_fields:
             incoming = getattr(patch, name)
