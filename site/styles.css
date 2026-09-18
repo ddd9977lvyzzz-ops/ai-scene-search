@@ -46,3 +46,4 @@
   .collection-grid,.community-grid,.social-source-grid{grid-template-columns:1fr}
   .sheet-head,.auth-form{padding-left:20px;padding-right:20px}.privacy-note{padding-left:20px;padding-right:20px}
 }
+.secondary-action{height:40px;border:1px solid var(--line);border-radius:12px;background:#fff;color:#77736c;cursor:pointer;font-size:11px}
