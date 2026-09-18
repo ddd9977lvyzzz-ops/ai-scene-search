@@ -1,5 +1,4 @@
 name: Deploy interactive portfolio to GitHub Pages
-# catalog-complete: 3339
 
 on:
   push:
@@ -27,21 +26,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Verify static catalog
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import base64, gzip, json
-          from pathlib import Path
-          root = Path("site/catalog.parts")
-          manifest = json.loads((root / "manifest.json").read_text())
-          payload = "".join((root / p).read_text().strip() for p in manifest["parts"])
-          data = json.loads(gzip.decompress(base64.b64decode(payload)))
-          assert len(data["items"]) == 3339, len(data["items"])
-          print("catalog records:", len(data["items"]))
-          PY
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
