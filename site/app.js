@@ -1,6 +1,6 @@
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const labels={solo:'自己看',family:'和家人',friends:'和朋友',couple:'和对象',weekend:'周末',party:'聚会',late_night:'睡前',meal:'饭后',light:'轻松',relaxing:'放松',healing:'治愈',funny:'好笑',exciting:'刺激',tense:'紧张',thought_provoking:'烧脑',romantic:'恋爱感',movie:'电影',series:'电视剧',variety:'综艺',animation:'动漫',documentary:'纪录片',low:'低负担',high:'高信息量',Romance:'恋爱/爱情',Comedy:'喜剧',Thriller:'悬疑',Mystery:'推理',Action:'动作',Horror:'恐怖',niche:'小众优先',mainstream:'热门优先',sweet:'偏甜',gentle:'温柔',realistic:'现实',bittersweet:'苦甜',dark:'偏暗黑',playful:'轻快',warm:'温暖',precise:'精准匹配',balanced:'适度探索',explore:'探索模式',no_character_death:'没有角色死亡',happy_ending:'明确偏圆满',no_animal_harm:'无动物伤害',no_infidelity:'无出轨主线',no_gore:'无血腥重点',no_jump_scares:'无跳吓重点',no_sexual_content:'无明显大尺度',family_safe:'家庭共看友好',closed_ending:'结局收束',romance_central:'恋爱主线',friendship_central:'友情主线',career_central:'事业成长',iqiyi:'爱奇艺',tencent_video:'腾讯视频',youku:'优酷',mango_tv:'芒果TV',netflix:'Netflix',disney_plus:'Disney+',max:'Max',prime_video:'Prime Video'};
+const labels={solo:'自己看',family:'和家人',friends:'和朋友',couple:'和对象',weekend:'周末',party:'聚会',late_night:'睡前',meal:'饭后',light:'轻松',relaxing:'放松',healing:'治愈',funny:'好笑',exciting:'刺激',tense:'紧张',thought_provoking:'烧脑',romantic:'恋爱感',movie:'电影',series:'电视剧',variety:'综艺',animation:'动漫',documentary:'纪录片',low:'低负担',high:'高信息量',Romance:'恋爱/爱情',Comedy:'喜剧',Thriller:'悬疑',Mystery:'推理',Action:'动作',Horror:'恐怖',niche:'小众优先',mainstream:'热门优先',sweet:'偏甜',gentle:'温柔',realistic:'现实',bittersweet:'苦甜',dark:'偏暗黑',playful:'轻快',warm:'温暖',precise:'精准匹配',balanced:'适度探索',explore:'探索模式',no_character_death:'没有角色死亡',happy_ending:'明确偏圆满',no_animal_harm:'无动物伤害',no_infidelity:'无出轨主线',no_gore:'无血腥重点',no_jump_scares:'无跳吓重点',no_sexual_content:'无明显大尺度',family_safe:'家庭共看友好',closed_ending:'结局收束',romance_central:'恋爱主线',friendship_central:'友情主线',career_central:'事业成长',social_embarrassment:'尴尬/社死桥段',violence_possible:'暴力内容',emotionally_heavy:'情绪沉重',fear_or_horror:'恐怖/惊吓',iqiyi:'爱奇艺',tencent_video:'腾讯视频',youku:'优酷',mango_tv:'芒果TV',netflix:'Netflix',disney_plus:'Disney+',max:'Max',prime_video:'Prime Video'};
 const starters=['我只看爱奇艺，想找2026年的国产剧','今晚一个人看，想轻松一点但不要太俗套','和朋友聚会，想看节奏快又好笑的电影','和爸妈一起看，想找轻松自然的国产片','像《功夫》一样有喜剧节奏，但换个题材','周末想看一部高信息量的悬疑片','最近想探索小众一点的华语电影','别给我列表，今晚直接替我选一部'];
 const CONFIG=window.YING_CONFIG||{apiBase:'',preferBackend:false,pagesPreview:true};
 const state={catalog:[],profile:freshProfile(),seen:new Set(),busy:false,lastQuery:'',backendReady:false,backendSession:null,agentMode:'local-retrieval'};
@@ -387,10 +387,49 @@ async function removeProfileFilter(key,value){
     }catch(e){console.warn('profile remove sync failed',e)}
   }
 }
+function removeProfileToken(kind,value){
+  const p=state.profile;
+  const listMap={moods:'moods',contentTypes:'contentTypes',requiredGenres:'requiredGenres',relationship:'relationship',pace:'pace',requiredFacts:'requiredFacts',avoidGenres:'avoidGenres',avoidRisks:'avoidRisks',tone:'tone'};
+  if(listMap[kind])p[listMap[kind]]=p[listMap[kind]].filter(x=>x!==value);
+  else if(kind==='companions')p.companions=null;
+  else if(kind==='scene')p.scene=null;
+  else if(kind==='cognitive')p.cognitive=null;
+  else if(kind==='language')p.language=null;
+  else if(kind==='sourceReference')p.sourceReference=null;
+  else if(kind==='popularity')p.popularity=null;
+  else if(kind==='runtimeMax')p.runtimeMax=null;
+  else if(kind==='yearMin')p.yearMin=null;
+  else if(kind==='platform')p.platform=null;
+  else if(kind==='pickOne')p.pickOne=false;
+  else if(kind==='explore')p.explore=false;
+  profileChips();
+  toast('已移除条件');
+}
 function profileChips(){
-  const chips=profileChipData(), n=$('#active-profile');
-  n.innerHTML=chips.map(x=>`<button class="filter-chip" type="button" data-remove-filter="${esc(x.key)}" data-filter-value="${esc(x.value)}" title="点击删除条件"><span>${esc(x.label)}</span><span class="chip-x">×</span></button>`).join('');
-  n.classList.toggle('hidden',!chips.length);
+  const p=state.profile,tokens=[];
+  const push=(kind,value,label)=>{if(value!==null&&value!==undefined&&value!=='')tokens.push({kind,value,label})};
+  push('companions',p.companions,labels[p.companions]||p.companions);
+  push('scene',p.scene,labels[p.scene]||p.scene);
+  p.moods.forEach(x=>push('moods',x,labels[x]||x));
+  push('cognitive',p.cognitive,labels[p.cognitive]||p.cognitive);
+  p.contentTypes.forEach(x=>push('contentTypes',x,labels[x]||x));
+  p.requiredGenres.forEach(x=>push('requiredGenres',x,labels[x]||x));
+  p.relationship.forEach(x=>push('relationship',x,labels[x]||x));
+  p.pace.forEach(x=>push('pace',x,labels[x]||x));
+  if(p.language)push('language',p.language,'中文/国产');
+  if(p.sourceReference)push('sourceReference',p.sourceReference,`类似《${p.sourceReference}》`);
+  if(p.popularity)push('popularity',p.popularity,labels[p.popularity]||p.popularity);
+  if(p.runtimeMax)push('runtimeMax',String(p.runtimeMax),`≤ ${p.runtimeMax} 分钟`);
+  if(p.yearMin)push('yearMin',String(p.yearMin),`${p.yearMin}+`);
+  if(p.platform)push('platform',p.platform,`只看 ${labels[p.platform]||p.platform}`);
+  if(p.pickOne)push('pickOne','1','帮我拍板');
+  p.requiredFacts.forEach(x=>push('requiredFacts',x,labels[x]||x));
+  if(p.explore)push('explore','1','探索模式');
+  p.avoidGenres.forEach(x=>push('avoidGenres',x,`不要 ${labels[x]||x}`));
+  p.avoidRisks.forEach(x=>push('avoidRisks',x,`避开 ${labels[x]||x}`));
+  const n=$('#active-profile');
+  n.innerHTML=tokens.map(t=>`<button class="profile-chip" type="button" data-profile-kind="${esc(t.kind)}" data-profile-value="${esc(t.value)}"><span>${esc(t.label)}</span><i aria-hidden="true">×</i></button>`).join('');
+  n.classList.toggle('hidden',!tokens.length);
 }
 function startConversation(){$('#welcome').classList.add('hidden');$('#conversation').classList.remove('hidden')}
 function addUser(t){startConversation();$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-user"><p>${esc(t)}</p></div>`)}
