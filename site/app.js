@@ -82,6 +82,11 @@ function parse(text){
   if(/只给我一个|直接选一个|替我选一个|帮我拍板|别给列表/.test(q)) p.pickOne=true;
   if(/电影/.test(q)) p.contentTypes=['movie']; else if(/电视剧|剧集|追一部.*剧|想看.*剧|恋爱剧|爱情剧|甜宠剧|小甜剧/.test(q)) p.contentTypes=['series'];
   if(/国产|中国大陆|中文/.test(q)) p.language='Chinese';
+  if(/爱奇艺|iQIYI/i.test(q)) p.platform='iqiyi';
+  else if(/腾讯视频|WeTV/i.test(q)) p.platform='tencent_video';
+  else if(/优酷|Youku/i.test(q)) p.platform='youku';
+  else if(/芒果(?:TV|tv)?/.test(q)) p.platform='mango_tv';
+  else if(/Netflix|网飞/i.test(q)) p.platform='netflix';
   const y=q.match(/(20\d{2})/); if(y)p.yearMin=Number(y[1]);
   if(/恋爱|爱情|纯爱|甜宠/.test(q)){p.requiredGenres=mergeUnique(p.requiredGenres,['Romance']);p.relationship=mergeUnique(p.relationship,['romantic']);}
   if(/喜剧|好笑|搞笑|逗|想笑/.test(q)){p.requiredSignals=mergeUnique(p.requiredSignals,['funny']);}
@@ -147,6 +152,7 @@ function failedConstraints(x){const p=state.profile,fail=[];
   if(p.yearMin&&(!x.y||Number(x.y)<p.yearMin))fail.push(`${p.yearMin}+ 年份`);
   if(p.runtimeMax&&(!x.rt&&!x.ert||Number(x.rt||x.ert)>p.runtimeMax))fail.push(`≤${p.runtimeMax}分钟`);
   if(p.language==='Chinese'&&!arr(x.co).some(c=>String(c).includes('中国大陆'))&&!['中文','Chinese','Mandarin','Cantonese'].includes(x.la))fail.push('国产/中文');
+  if(p.platform&&!arr(x.pl).includes(p.platform))fail.push(labels[p.platform]||p.platform);
   p.requiredGenres.filter(g=>!hasGenre(x,g)).forEach(g=>fail.push(labels[g]||g));
   p.avoidGenres.filter(g=>hasGenre(x,g)).forEach(g=>fail.push('排除 '+(labels[g]||g)));
   p.avoidRisks.filter(r=>arr(x.ri).includes(r)).forEach(r=>fail.push('雷点 '+(labels[r]||r)));
@@ -203,7 +209,7 @@ function reason(x){const p=state.profile;const bits=[];
   if(vectorScore(x)>.25)bits.push('场景特征向量相似度较高');
   if(p.sourceReference&&anchorScore(x)>.15)bits.push(`与《${p.sourceReference}》在类型/氛围上有相似点`);
   return bits.slice(0,3).join('；')||'在当前合法候选里，综合类型、场景和内容理解得分靠前。';}
-function profileChips(){const p=state.profile;const raw=[p.companions,p.scene,...p.moods,p.cognitive,...p.contentTypes,...p.requiredGenres,...p.relationship,...p.pace].filter(Boolean);let vals=raw.map(x=>labels[x]||x);if(p.language)vals.push('中文/国产');if(p.sourceReference)vals.push(`类似《${p.sourceReference}》`);if(p.popularity)vals.push(labels[p.popularity]);if(p.runtimeMax)vals.push(`≤ ${p.runtimeMax} 分钟`);if(p.yearMin)vals.push(`${p.yearMin}+`);if(p.pickOne)vals.push('帮我拍板');p.requiredFacts.forEach(x=>vals.push(labels[x]||x));if(p.explore)vals.push('探索模式');p.avoidGenres.forEach(x=>vals.push(`不要 ${labels[x]||x}`));p.avoidRisks.forEach(x=>vals.push(x==='emotionally_heavy'?'不要太虐':x==='fear_or_horror'?'不要惊吓':`避开 ${x}`));const n=$('#active-profile');n.innerHTML=[...new Set(vals)].map(x=>`<span>${esc(x)}</span>`).join('');n.classList.toggle('hidden',!vals.length)}
+function profileChips(){const p=state.profile;const raw=[p.companions,p.scene,...p.moods,p.cognitive,...p.contentTypes,...p.requiredGenres,...p.relationship,...p.pace].filter(Boolean);let vals=raw.map(x=>labels[x]||x);if(p.language)vals.push('中文/国产');if(p.sourceReference)vals.push(`类似《${p.sourceReference}》`);if(p.popularity)vals.push(labels[p.popularity]);if(p.runtimeMax)vals.push(`≤ ${p.runtimeMax} 分钟`);if(p.yearMin)vals.push(`${p.yearMin}+`);if(p.platform)vals.push(`只看 ${labels[p.platform]||p.platform}`);if(p.pickOne)vals.push('帮我拍板');p.requiredFacts.forEach(x=>vals.push(labels[x]||x));if(p.explore)vals.push('探索模式');p.avoidGenres.forEach(x=>vals.push(`不要 ${labels[x]||x}`));p.avoidRisks.forEach(x=>vals.push(x==='emotionally_heavy'?'不要太虐':x==='fear_or_horror'?'不要惊吓':`避开 ${x}`));const n=$('#active-profile');n.innerHTML=[...new Set(vals)].map(x=>`<span>${esc(x)}</span>`).join('');n.classList.toggle('hidden',!vals.length)}
 function startConversation(){$('#welcome').classList.add('hidden');$('#conversation').classList.remove('hidden')}
 function addUser(t){startConversation();$('#messages').insertAdjacentHTML('beforeend',`<div class="turn-user"><p>${esc(t)}</p></div>`)}
 function card(x,i){
@@ -277,10 +283,10 @@ const FALLBACK_ITEMS=[
 ,{id:"cn26:panda",t:"熊猫计划之部落奇遇记",ct:"movie",y:2026,co:["中国大陆"],g:["Comedy","Adventure","Family"],d:"熊猫胡胡与国际巨星意外进入神奇部落，在冒险中帮助部落解决难题。",rt:100,p:"",sc:["family","friends"],em:["funny","light","relaxing"],cl:"low",pa:["lively"],ri:[],to:["playful","warm"],cf:["family_safe","no_gore","no_jump_scares","no_sexual_content","no_infidelity"],rn:["家庭向冒险中的轻度危机"],sn:["真人与熊猫的错位组合"],pb:"high",uc:.68,src:"国家电影局 2026 春节档片单"}
 ,{id:"cn26:boonie",t:"熊出没·年年有熊",ct:"movie",y:2026,co:["中国大陆"],g:["Animation","Comedy","Family","Adventure"],d:"不速之客引发危机后，熊大、熊二和光头强再次合作化解问题。",rt:99,p:"",sc:["family"],em:["funny","light","relaxing"],cl:"low",pa:["lively"],ri:[],to:["playful","warm"],cf:["family_safe","no_gore","no_sexual_content","no_infidelity"],rn:["动画冒险中有轻度危机"],sn:["熟人角色组合与合家欢冒险"],pb:"high",uc:.7,src:"国家电影局 2026 春节档片单"}
 ,{id:"cn26:qunxing",t:"群星闪耀时",ct:"movie",y:2026,co:["中国大陆"],g:["Science-Fiction","Adventure","Drama"],d:"航天员在太空遭遇险情，并收到来自过去的神秘电子信号，需要破译信号援救未来。",rt:125,p:"",sc:["friends","solo"],em:["tense","exciting","thought_provoking"],cl:"high",pa:["fast"],ri:["violence_possible"],to:["realistic"],cf:[],rn:["太空险情与生存压力"],sn:["跨时间信号与航天救援"],pb:"medium",uc:.7,src:"国家电影局 2026 暑期档片单"}
-,{id:"cn26:jiaye",t:"家业",ct:"series",y:2026,co:["中国大陆"],g:["Drama","History","Romance"],d:"明朝徽州贡墨案后，李祯以制墨天赋重振家业，并与骆文谦从竞争走向合作。",ert:45,p:"",ra:8.8,sc:["solo","family"],em:["romantic","thought_provoking"],cl:"medium",pa:["moderate"],ri:["emotionally_heavy"],re:["romantic","family"],to:["realistic","warm"],cf:["happy_ending","closed_ending","career_central","romance_central"],rn:["家族兴衰、竞争和阶段性死亡/离别议题"],sn:["非遗制墨、女性事业成长与合作型关系"],pb:"high",uc:.88,src:"爱奇艺 2026 正片页"}
+,{id:"cn26:jiaye",t:"家业",ct:"series",y:2026,co:["中国大陆"],g:["Drama","History","Romance"],d:"明朝徽州贡墨案后，李祯以制墨天赋重振家业，并与骆文谦从竞争走向合作。",ert:45,p:"",ra:8.8,sc:["solo","family"],em:["romantic","thought_provoking"],cl:"medium",pa:["moderate"],ri:["emotionally_heavy"],re:["romantic","family"],to:["realistic","warm"],cf:["happy_ending","closed_ending","career_central","romance_central"],rn:["家族兴衰、竞争和阶段性死亡/离别议题"],sn:["非遗制墨、女性事业成长与合作型关系"],pb:"high",uc:.88,src:"爱奇艺 2026 正片页",pl:["iqiyi"]}
 
-,{id:"cn26:yiouchun",t:"一瓯春",ct:"series",y:2026,co:["中国大陆"],g:["Drama","Romance","History"],d:"谢清圆与沈润在高门与朝堂暗流中互相试探、携手复仇，并最终走向新生。",ert:45,p:"",sc:["solo"],em:["romantic","tense"],cl:"medium",pa:["moderate"],ri:["violence_possible","emotionally_heavy"],re:["romantic"],to:["realistic","dark","bittersweet"],cf:["happy_ending","closed_ending","romance_central"],rn:["复仇、权谋与暴力情节；不是纯甜恋爱"],sn:["双强关系与复仇线并进"],pb:"high",uc:.86,src:"爱奇艺 2026 正片页"}
-,{id:"cn26:shenyuan",t:"深渊无间",ct:"series",y:2026,co:["中国大陆"],g:["Thriller","Mystery","Crime"],d:"推理网文与多年悬案细节高度重合，新警李成在多方嫌疑人之间展开高智对弈。",ert:45,p:"",sc:["solo"],em:["tense","thought_provoking"],cl:"high",pa:["fast"],ri:["violence_possible","emotionally_heavy"],to:["dark","realistic"],cf:["closed_ending"],rn:["悬案、犯罪与令人扼腕的亲情友情真相"],sn:["网文与真实悬案互相映照的元叙事入口"],pb:"high",uc:.86,src:"爱奇艺 2026 正片页"}
+,{id:"cn26:yiouchun",t:"一瓯春",ct:"series",y:2026,co:["中国大陆"],g:["Drama","Romance","History"],d:"谢清圆与沈润在高门与朝堂暗流中互相试探、携手复仇，并最终走向新生。",ert:45,p:"",sc:["solo"],em:["romantic","tense"],cl:"medium",pa:["moderate"],ri:["violence_possible","emotionally_heavy"],re:["romantic"],to:["realistic","dark","bittersweet"],cf:["happy_ending","closed_ending","romance_central"],rn:["复仇、权谋与暴力情节；不是纯甜恋爱"],sn:["双强关系与复仇线并进"],pb:"high",uc:.86,src:"爱奇艺 2026 正片页",pl:["iqiyi"]}
+,{id:"cn26:shenyuan",t:"深渊无间",ct:"series",y:2026,co:["中国大陆"],g:["Thriller","Mystery","Crime"],d:"推理网文与多年悬案细节高度重合，新警李成在多方嫌疑人之间展开高智对弈。",ert:45,p:"",sc:["solo"],em:["tense","thought_provoking"],cl:"high",pa:["fast"],ri:["violence_possible","emotionally_heavy"],to:["dark","realistic"],cf:["closed_ending"],rn:["悬案、犯罪与令人扼腕的亲情友情真相"],sn:["网文与真实悬案互相映照的元叙事入口"],pb:"high",uc:.86,src:"爱奇艺 2026 正片页",pl:["iqiyi"]}
 ,{id:"safe:intern",t:"实习生",ct:"movie",y:2015,co:["United States"],g:["Comedy","Drama"],d:"退休老人进入互联网创业公司成为高龄实习生，在代际相处中重新找到生活节奏。",rt:121,p:"",sc:["solo","family"],em:["funny","light","relaxing","healing"],cl:"low",pa:["moderate"],ri:[],re:["friendship","workplace"],to:["warm","gentle"],cf:["no_character_death","no_animal_harm","no_gore","no_jump_scares","no_sexual_content","no_infidelity","family_safe","closed_ending"],rn:["存在婚姻关系压力，但不是暴力或惊吓型内容"],sn:["代际友谊和职场陪伴感"],pb:"medium",uc:.76,src:"demo curated content-facts"}
 ,{id:"safe:chef",t:"落魄大厨",ct:"movie",y:2014,co:["United States"],g:["Comedy","Drama"],d:"厨师离开受挫的餐厅工作后开起餐车，与家人和朋友重新建立连接。",rt:114,p:"",sc:["solo","family","friends"],em:["funny","light","relaxing","healing"],cl:"low",pa:["lively"],ri:[],re:["family","friendship"],to:["warm","playful"],cf:["no_character_death","happy_ending","no_gore","no_jump_scares","closed_ending"],rn:["少量成人语言"],sn:["美食、公路与亲子关系的修复"],pb:"medium",uc:.78,src:"demo curated content-facts"}
 ,{id:"safe:legally",t:"律政俏佳人",ct:"movie",y:2001,co:["United States"],g:["Comedy","Romance"],d:"女主因感情挫折进入法学院，逐步把外界偏见转化成自我证明。",rt:96,p:"",sc:["solo","friends"],em:["funny","light","relaxing"],cl:"low",pa:["lively"],ri:[],re:["romantic","friendship"],to:["playful","warm"],cf:["no_character_death","happy_ending","no_gore","no_jump_scares","closed_ending"],rn:["有情感分手和轻度成人话题"],sn:["从恋爱动机转向自我成长"],pb:"medium",uc:.78,src:"demo curated content-facts"}
@@ -303,6 +309,7 @@ function inferLive(show){
   if(!pa.length)pa.push(low?'lively':'moderate');
   return {em:[...new Set(em)],ri:[...new Set(ri)],re:[...new Set(re)],to:[...new Set(to)],pa,cl:high&&!low?'high':low?'low':'medium'};
 }
+function normalizePlatform(name){const n=lower(name).replace(/\s+/g,'');if(n.includes('iqiyi'))return 'iqiyi';if(n.includes('tencent')||n.includes('wetv'))return 'tencent_video';if(n.includes('youku'))return 'youku';if(n.includes('mango'))return 'mango_tv';if(n.includes('netflix'))return 'netflix';if(n.includes('disney'))return 'disney_plus';if(n.includes('amazon')||n.includes('primevideo'))return 'prime_video';if(n==='max'||n.includes('hbomax'))return 'max';return null;}
 async function fetchJson(url,ms=12000){const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),ms);try{const r=await fetch(url,{signal:ctl.signal,headers:{Accept:'application/json'}});if(!r.ok)throw new Error(r.status);return await r.json();}finally{clearTimeout(t)}}
 async function loadLiveCatalog(){
   const pages=[0,1,2,3];
@@ -312,16 +319,16 @@ async function loadLiveCatalog(){
     const inf=inferLive(s);
     const country=s.network?.country?.name||s.webChannel?.country?.name||'';
     const type=(s.type==='Reality'||s.type==='Game Show'||s.type==='Talk Show')?'variety':(arr(s.genres).includes('Animation')?'animation':'series');
-    const item={id:'tvmaze-live:'+s.id,t:s.name,ot:s.name,ct:type,y:Number((s.premiered||'').slice(0,4))||null,co:country?[country]:[],g:arr(s.genres),d:stripHtml(s.summary).slice(0,420),ert:s.averageRuntime||s.runtime||null,p:s.image?.original||s.image?.medium||'',ra:s.rating?.average??null,sc:type==='variety'?['friends','party']:['solo'],...inf,pb:(s.weight||0)>85?'high':(s.weight||0)>45?'medium':'low',uc:.62,cf:[]}; item.p=item.p||generatedPoster(item); return item;
+    const sourcePlatform=normalizePlatform(s.webChannel?.name||s.network?.name||''); const item={id:'tvmaze-live:'+s.id,t:s.name,ot:s.name,ct:type,y:Number((s.premiered||'').slice(0,4))||null,co:country?[country]:[],g:arr(s.genres),d:stripHtml(s.summary).slice(0,420),ert:s.averageRuntime||s.runtime||null,p:s.image?.original||s.image?.medium||'',ra:s.rating?.average??null,sc:type==='variety'?['friends','party']:['solo'],...inf,pb:(s.weight||0)>85?'high':(s.weight||0)>45?'medium':'low',uc:.62,cf:[],pl:sourcePlatform?[sourcePlatform]:[]}; item.p=item.p||generatedPoster(item); return item;
   });
-  const byId=new Map(FALLBACK_ITEMS.map(x=>[x.id,{...x,p:posterFor(x)}])); for(const x of mapped)if(!byId.has(x.id))byId.set(x.id,x);
-  const items=[...byId.values()].map(x=>({...x,p:posterFor(x)}));
+  const byId=new Map(FALLBACK_ITEMS.map(x=>[x.id,{...x,p:posterFor(x),pl:arr(x.pl)}])); for(const x of mapped)if(!byId.has(x.id))byId.set(x.id,x);
+  const items=[...byId.values()].map(x=>({...x,p:posterFor(x),pl:arr(x.pl)}));
   if(items.length<150)throw new Error('live catalog too small');
   return {version:'live-tvmaze-plus-curated',count:items.length,full_catalog_count:3339,items};
 }
 async function loadCatalog(){
   try{return await loadLiveCatalog();}
-  catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.map(x=>({...x,p:posterFor(x)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
+  catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.map(x=>({...x,p:posterFor(x),pl:arr(x.pl)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
 }
 async function init(){try{const data=await loadCatalog();state.catalog=data.items||[];$('#catalog-status').innerHTML=`<i></i>${state.catalog.length.toLocaleString()} 部内容 · 海报 100% · 多通道召回`;$('#starter-grid').innerHTML=starters.map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');}catch(e){console.error(e);toast('片库加载失败，请刷新页面')}}
 document.addEventListener('click',e=>{const p=e.target.closest('[data-prompt]');if(p)sendMessage(p.dataset.prompt);const d=e.target.closest('[data-detail]');if(d)openDetail(d.dataset.detail)});$('#composer').addEventListener('submit',e=>{e.preventDefault();sendMessage($('#message-input').value)});$('#message-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(e.target.value)}});$('#new-chat').addEventListener('click',reset);$('#detail-close').addEventListener('click',()=>$('#detail-dialog').close());init();
