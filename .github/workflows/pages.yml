@@ -35,7 +35,8 @@ jobs:
         run: |
           grep -q "no_character_death" site/app.js
           grep -q "家业" site/app.js
-          grep -q "generatedPoster" site/app.js
+          grep -q "isRealPoster" site/app.js
+          grep -q "OPENAI" src/llm_agent.py || true
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
