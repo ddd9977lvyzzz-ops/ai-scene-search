@@ -7,10 +7,8 @@ public metadata sources can lag current Chinese releases, so we keep a transpare
 with official/public source URLs and let the normal poster fallback policy fill missing artwork.
 """
 
-from .catalog_builder import Record
-
-
-def curated_2026_records() -> list[Record]:
+def curated_2026_records(record_cls):
+    Record = record_cls
     film_bureau_spring = "https://www.chinafilm.gov.cn/xwzx/gzdt/202602/t20260209_949645.html"
     film_bureau_summer = "https://www.chinafilm.gov.cn/xwzx/ywxx/202606/t20260625_996069.html"
 
