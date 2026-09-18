@@ -498,7 +498,7 @@ def write_db(path: str, records: list[Record]) -> None:
         "poster_policy":"source_or_generated_svg_fallback",
         "record_count":str(len(records)),
         "builder":"public_api_catalog_builder_v1",
-        "sources":"tvmaze,wikidata",
+        "sources":"tvmaze,wikidata,curated_2026_official_public_pages",
     }
     for key,value in meta.items():
         con.execute("INSERT OR REPLACE INTO catalog_meta VALUES (?,?)",(key,value))
@@ -519,6 +519,8 @@ def main():
     records=tvmaze_records(fetcher,args.tvmaze_target)
     china=china_series_records(fetcher,args.china_series_target)
     records.extend(china)
+    from data_pipeline.curated_2026 import curated_2026_records
+    records.extend(curated_2026_records(Record))
     for _,qid in COUNTRIES.items():
         records.extend(wikidata_records(fetcher,kind="movie",country_qid=qid,limit=args.movies_per_country))
     records=merge_records(records)
