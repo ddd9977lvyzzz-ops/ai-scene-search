@@ -1,7 +1,16 @@
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const labels={solo:'自己看',family:'和家人',friends:'和朋友',couple:'和对象',weekend:'周末',party:'聚会',late_night:'睡前',meal:'饭后',light:'轻松',relaxing:'放松',healing:'治愈',funny:'好笑',exciting:'刺激',tense:'紧张',thought_provoking:'烧脑',romantic:'恋爱感',movie:'电影',series:'电视剧',variety:'综艺',animation:'动漫',documentary:'纪录片',low:'低负担',high:'高信息量',Romance:'恋爱/爱情',Comedy:'喜剧',Thriller:'悬疑',Mystery:'推理',Action:'动作',Horror:'恐怖',niche:'小众优先',mainstream:'热门优先',sweet:'偏甜',gentle:'温柔',realistic:'现实',bittersweet:'苦甜',dark:'偏暗黑',playful:'轻快',warm:'温暖',precise:'精准匹配',balanced:'适度探索',explore:'探索模式',no_character_death:'没有角色死亡',happy_ending:'明确偏圆满',no_animal_harm:'无动物伤害',no_infidelity:'无出轨主线',no_gore:'无血腥重点',no_jump_scares:'无跳吓重点',no_sexual_content:'无明显大尺度',family_safe:'家庭共看友好',closed_ending:'结局收束',romance_central:'恋爱主线',friendship_central:'友情主线',career_central:'事业成长',social_embarrassment:'尴尬/社死桥段',violence_possible:'暴力内容',emotionally_heavy:'情绪沉重',fear_or_horror:'恐怖/惊吓',iqiyi:'爱奇艺',tencent_video:'腾讯视频',youku:'优酷',mango_tv:'芒果TV',netflix:'Netflix',disney_plus:'Disney+',max:'Max',prime_video:'Prime Video'};
-const starters=['我只看爱奇艺，想找2026年的国产剧','今晚一个人看，想轻松一点但不要太俗套','和朋友聚会，想看节奏快又好笑的电影','和爸妈一起看，想找轻松自然的国产片','像《功夫》一样有喜剧节奏，但换个题材','周末想看一部高信息量的悬疑片','最近想探索小众一点的华语电影','别给我列表，今晚直接替我选一部'];
+const starters=[
+  '今天下班很累，想看轻松一点的','我只看爱奇艺，想找2026年的国产剧','和朋友聚会，想看轻松好笑的电影',
+  '和家人一起看，想找温暖一点的','像《功夫》一样有喜剧节奏，但换个题材','周末想看悬疑一点，但别太吓人',
+  '最近想探索小众一点的华语电影','别给我列表，直接替我选一部','想看一部90分钟左右、不拖沓的电影',
+  '想找适合雨天一个人看的电影','今天情绪有点低，想看温柔但不煽情的','想看高信息量、需要认真看的悬疑片',
+  '和对象看，想浪漫一点但不要俗套','最近只想看2026年新出的国产内容','给我一部视觉很好看的科幻片',
+  '想找友情线很强、恋爱线很弱的作品','周末下午想看慢一点、有余味的电影','想看女性成长题材，但不要鸡汤感',
+  '吃饭的时候看，最好能随时暂停','想看一部气质很特别但不晦涩的电影','今晚想看爽一点的，但不要太吵',
+  '想找节奏舒缓、画面很美的剧','最近想补一部被低估的经典','看完想有点讨论空间，但别太沉重'
+];
 const CONFIG=window.YING_CONFIG||{apiBase:'',preferBackend:false,pagesPreview:true};
 const state={catalog:[],profile:freshProfile(),seen:new Set(),busy:false,lastQuery:'',backendReady:false,backendSession:null,agentMode:'local-retrieval'};
 const STORAGE_PREFIX='ying:v1:';
@@ -596,8 +605,17 @@ async function loadCatalog(){
   try{return await loadLiveCatalog();}
   catch(e){console.warn('Live catalog unavailable; using curated fallback.',e);const items=FALLBACK_ITEMS.filter(x=>isRealPoster(x.p)).map(x=>({...x,pl:arr(x.pl)}));return {version:'curated-fallback',count:items.length,full_catalog_count:3339,items};}
 }
+function renderPromptStream(){
+  const lanes=[
+    ['#prompt-lane-a',starters.slice(0,8)],
+    ['#prompt-lane-b',starters.slice(8,16)],
+    ['#prompt-lane-c',starters.slice(16,24)]
+  ];
+  const lane=xs=>[...xs,...xs].map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');
+  lanes.forEach(([sel,items])=>{const el=$(sel);if(el)el.innerHTML=lane(items)});
+}
 async function init(){
-  loadAccount();renderCommunity();renderDiscover();
+  loadAccount();renderCommunity();renderDiscover();renderPromptStream();
   const aiReady=await initBackend();
   if(aiReady)await syncAccountFromBackend();
   try{
@@ -605,7 +623,7 @@ async function init(){
     state.catalog=data.items||[];
     renderCollection();
     $('#catalog-status').innerHTML=aiReady?`<i></i>AI Agent · ${state.catalog.length.toLocaleString()} 部预览内容`:`<i></i>Pages 预览 · ${state.catalog.length.toLocaleString()} 部真实海报内容`;
-    const mid=Math.ceil(starters.length/2);const a=starters.slice(0,mid),b=starters.slice(mid);const lane=xs=>[...xs,...xs].map(x=>`<button class="starter" type="button" data-prompt="${esc(x)}">${esc(x)}</button>`).join('');$('#prompt-lane-a').innerHTML=lane(a);$('#prompt-lane-b').innerHTML=lane(b);
+    renderPromptStream();
     const initial=(location.hash||'#agent').slice(1);switchView(['agent','discover','community','library'].includes(initial)?initial:'agent');
   }catch(e){console.error(e);toast('片库加载失败，请刷新页面')}
 }
