@@ -132,3 +132,71 @@ https://github.com/ddd9977lvyzzz-ops/ai-scene-search
 - 爱奇艺《家业》正片页：https://www.iqiyi.com/a_131ig5wtqg5.html
 - 爱奇艺《一瓯春》正片页：https://www.iqiyi.com/a_2b9ocx2qugh.html
 - 爱奇艺《深渊无间》正片页：https://www.iqiyi.com/a_okv7zmsbr1.html
+
+
+## V1.4 — Full website / model-backed Agent
+
+The project now has two deliberately separate modes:
+
+### GitHub Pages preview
+
+- Full front-end shell: Agent / Discover / Community / Library / Account.
+- Removable active-filter chips.
+- Real-poster-only preview catalog: entries without a reachable HTTP(S) poster are excluded rather than shown with fake/generated artwork.
+- Local retrieval exists only as a portfolio preview and is explicitly labeled as such.
+
+### Full FastAPI website
+
+The same UI switches to the backend when `window.YING_CONFIG.apiBase` points to a deployed service.
+
+Conversation path:
+
+```text
+Browser
+→ POST /v1/sessions/{id}/chat
+→ deterministic hard-constraint parser
+→ OpenAI Responses API semantic planner
+→ multi-channel retrieval / RRF
+→ Hard Gate
+→ reranker / Evidence RAG
+→ OpenAI Responses API grounded answer composer
+→ browser
+```
+
+Production sets:
+
+```text
+OPENAI_AGENT_ENABLED=1
+OPENAI_AGENT_REQUIRED=1
+OPENAI_AGENT_MODEL=gpt-6-astra
+OPENAI_API_KEY=<server-side secret>
+```
+
+If the API key is missing while `OPENAI_AGENT_REQUIRED=1`, `/health` returns 503 and the product does **not** silently disguise local search as an AI-agent response. OpenAI Structured Outputs are used for the query plan and grounded response schema. See the current OpenAI Responses / Structured Outputs documentation for the API contract.
+
+## Poster quality gate
+
+A displayed title must have real reachable artwork.
+
+Runtime catalog bootstrap runs:
+
+```text
+catalog_builder
+→ backfill_real_posters --strict
+→ content intelligence
+→ verified platform availability
+→ evidence corpus
+→ embeddings
+→ verify_catalog
+```
+
+Poster resolution order:
+
+1. existing trusted source artwork;
+2. official/provider page `og:image` / card image;
+3. TMDB poster search when `TMDB_API_TOKEN` is configured;
+4. TVMaze poster search for TV content;
+5. poster-labelled Wikimedia Commons search.
+
+Generated SVG placeholders and generic Wikidata P18 stills are rejected by the production quality gate. Startup fails if any canonical catalog row remains unresolved.
+
