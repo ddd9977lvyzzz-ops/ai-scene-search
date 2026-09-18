@@ -2,8 +2,9 @@ services:
   - type: web
     name: ying-scene-agent
     runtime: docker
+    plan: free
     healthCheckPath: /health
-    autoDeploy: true
+    autoDeployTrigger: checksPass
     envVars:
       - key: CATALOG_DB
         value: /app/db/catalog.sqlite3
@@ -25,6 +26,8 @@ services:
         sync: false
       - key: TMDB_API_TOKEN
         sync: false
+      - key: POSTER_WORKERS
+        value: '10'
       - key: BAIDU_SEARCH_API_KEY
         sync: false
       - key: X_BEARER_TOKEN
